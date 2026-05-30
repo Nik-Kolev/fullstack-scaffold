@@ -7,19 +7,32 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "docker:up": "docker compose up -d",
+    "docker:stop": "docker compose stop",
+    "db:migrate": "prisma migrate dev",
+    "db:reset": "prisma migrate reset",
+    "db:fresh": "node scripts/db-fresh.mjs",
+    "db:studio": "prisma studio",
+    "predev": "docker compose up -d",
     "dev": "nodemon --exec tsx --env-file .env --ext ts src/index.ts"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.21.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.1",
+    "@types/pg": "^8.20.0",
+    "dotenv": "^17.4.2",
     "nodemon": "^3.1.14",
+    "prisma": "^7.8.0",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3"
   }
