@@ -1,10 +1,10 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type JwtPayload } from 'jsonwebtoken';
 import crypto from 'crypto';
 
 type TokenType = 'access' | 'refresh';
 
 type TokenData = {
-  id: string;
+  id: string | number;
   email: string;
   role: string;
 };
@@ -21,13 +21,13 @@ const EXPIRY_SECONDS = {
 } as const;
 
 function getSecret(type: TokenType): string {
-  const secret = type === 'access' ? process.env.JWT_ACCESS_TOKEN : process.env.JWT_REFRESH_TOKEN;
+  const secret = type === 'access' ? process.env.JWT_ACCESS_SECRET : process.env.JWT_REFRESH_SECRET;
   if (!secret) throw new Error(`Missing env var for ${type} token secret`);
   return secret;
 }
 
 export function generateToken(type: TokenType, data: TokenData): TokenResult {
-  const payload: Record<string, string> = {
+  const payload: Record<string, string | number> = {
     userId: data.id,
     email: data.email,
     role: data.role,
@@ -49,6 +49,12 @@ export function generateToken(type: TokenType, data: TokenData): TokenResult {
   return result;
 }
 
-export function verifyToken(type: TokenType, token: string) {
-  return jwt.verify(token, getSecret(type));
+export function verifyToken(type: TokenType, token: string): JwtPayload {
+  return jwt.verify(token, getSecret(type)) as JwtPayload;
+}
+
+export function generateTokenPair(data: TokenData) {
+  const { token: accessToken } = generateToken('access', data);
+  const refreshToken = generateToken('refresh', data);
+  return { accessToken, refreshToken };
 }
