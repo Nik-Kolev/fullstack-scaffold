@@ -1,0 +1,73 @@
+import type { Request, Response } from 'express';
+import * as userService from '../services/authServices.js';
+import * as JWT from '../lib/jwt.js';
+
+export const createUser = async (req: Request, res: Response) => {
+	const { email, name, password } = req.body;
+	const { user, accessToken, refreshToken } = await userService.createUser({
+		email,
+		name,
+		password,
+	});
+
+	res.cookie('refreshToken', refreshToken.token, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: 'strict',
+		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
+	});
+	res.status(201).json({ user, accessToken });
+};
+
+export const loginUser = async (req: Request, res: Response) => {
+	const { email, password } = req.body;
+	const { user, accessToken, refreshToken } = await userService.loginUser(email, password);
+
+	res.cookie('refreshToken', refreshToken.token, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: 'strict',
+		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
+	});
+	res.status(200).json({ user, accessToken });
+};
+
+export const logoutUser = async (req: Request, res: Response) => {
+	const cookie = req.cookies.refreshToken;
+
+	if (cookie) {
+		const token = JWT.verifyToken('refresh', cookie);
+		await userService.logoutUser(token.refreshTokenId!);
+	}
+
+	res.clearCookie('refreshToken');
+	res.sendStatus(204);
+};
+
+export const refreshToken = async (req: Request, res: Response) => {
+	const cookie = req.cookies.refreshToken;
+
+	try {
+		const token = JWT.verifyToken('refresh', cookie);
+
+		const { accessToken, refreshToken } = await userService.refreshToken(
+			token.refreshTokenId!,
+			{
+				id: token.userId as number,
+				email: token.email as string,
+				role: token.role as string,
+			},
+		);
+
+		res.cookie('refreshToken', refreshToken.token, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'strict',
+			maxAge: refreshToken.expiryDate.getTime() - Date.now(),
+		});
+		res.status(200).json({ accessToken });
+	} catch (err) {
+		res.clearCookie('refreshToken');
+		throw err;
+	}
+};

@@ -14,7 +14,8 @@
     "db:fresh": "node scripts/db-fresh.mjs",
     "db:studio": "prisma studio",
     "predev": "docker compose up -d",
-    "dev": "nodemon --exec tsx --env-file .env --ext ts src/index.ts"
+    "dev": "nodemon --exec tsx --env-file .env --ext ts src/index.ts",
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
@@ -37,6 +38,7 @@
     "@types/pg": "^8.20.0",
     "dotenv": "^17.4.2",
     "nodemon": "^3.1.14",
+    "prettier": "^3.8.3",
     "prisma": "^7.8.0",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3"
