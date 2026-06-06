@@ -32,6 +32,7 @@ export function generateToken(type: TokenType, data: TokenData): TokenResult {
 		userId: data.id,
 		email: data.email,
 		role: data.role,
+		jti: crypto.randomUUID(),
 	};
 
 	let refreshTokenId: string | undefined;

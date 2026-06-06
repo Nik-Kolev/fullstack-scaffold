@@ -1,7 +1,9 @@
 import CustomError from '../utils/customError.js';
 import type { Request, Response, NextFunction } from 'express';
 import { Prisma } from '../generated/prisma/index.js';
-import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
+
+const { JsonWebTokenError, TokenExpiredError } = jwt;
 
 const PRISMA_ERROR_MAP: Record<string, { statusCode: number; message: string }> = {
 	P2000: { statusCode: 400, message: 'Input value is too long.' },

@@ -6,14 +6,18 @@ const handler = (_req: Request, _res: Response, next: NextFunction) => {
 	next(new CustomError(429, 'Too many requests, please try again later.'));
 };
 
+const skip = () => process.env.NODE_ENV === 'test';
+
 export const authLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	limit: 10,
 	handler,
+	skip,
 });
 
 export const generalLimiter = rateLimit({
 	windowMs: 60 * 1000,
 	limit: 100,
 	handler,
+	skip,
 });

@@ -8,6 +8,9 @@ Express + TypeScript REST API with Prisma ORM and PostgreSQL.
 - **Framework:** Express 5
 - **ORM:** Prisma 7
 - **Database:** PostgreSQL (Docker in dev, managed service in prod)
+- **Auth:** JWT — access token (15 min) + refresh token (7 d, httpOnly cookie)
+- **Validation:** Zod v4
+- **Hashing:** bcrypt v6
 
 ## Prerequisites
 
@@ -26,12 +29,14 @@ npm run dev
 
 ## Environment Variables
 
-| Variable       | Description                        |
-| -------------- | ---------------------------------- |
-| `PORT`         | Port the server listens on         |
-| `ORIGIN`       | Allowed CORS origin (frontend URL) |
-| `DATABASE_URL` | PostgreSQL connection string       |
-| `JWT_SECRET`   | Secret used to sign JWT tokens     |
+| Variable             | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `PORT`               | Port the server listens on                      |
+| `ORIGIN`             | Allowed CORS origin (frontend URL)              |
+| `DATABASE_URL`       | PostgreSQL connection string                    |
+| `JWT_ACCESS_SECRET`  | Secret used to sign access tokens (15 min)      |
+| `JWT_REFRESH_SECRET` | Secret used to sign refresh tokens (7 d)        |
+| `NODE_ENV`           | Set to `production` on deploy (gates secure cookie) |
 
 `DATABASE_URL` format: `postgresql://USER:PASSWORD@localhost:5432/DBNAME`
 
@@ -41,22 +46,26 @@ The credentials must match the values in the root `.env` used by Docker Compose.
 
 ```
 src/
-  index.ts          Entry point — creates app, mounts middleware, starts server
-  config/           Express middleware setup (cors, json, cookieParser)
+  app.ts            App factory — middleware, routes, error handler (no listen)
+  index.ts          Entry point — imports app, calls app.listen()
+  config/           Express middleware setup (cors, json, cookieParser, rate limiter)
   routes/           Route definitions — maps URLs to controllers
-  controllers/      Request/response handlers — calls services, returns responses
-  services/         Business logic — database queries live here
-  middleware/       Express middleware (error handler)
-  utils/            Shared utilities (CustomError class)
-  types/            TypeScript type augmentations (env.d.ts)
-  lib/              Third-party singletons (Prisma client instance)
+  controllers/      Thin handlers — call service, set cookie, send response
+  services/         All DB and business logic
+  middleware/       errorHandler, validateBody, isAuthenticated, requireRole, rateLimiter
+  schemas/          Zod schemas — one file per domain
+  types/            TypeScript augmentations (env.d.ts, express.d.ts)
+  lib/              Third-party singletons (prisma.ts, jwt.ts)
   generated/        Auto-generated Prisma client — do not edit
+  __tests__/        Integration tests
 
 prisma/
   schema/           Prisma schema files (one per domain)
-    base.prisma     Generator + datasource config
+    base.prisma     Generator config
     user.prisma     User model
+    refreshToken.prisma  RefreshToken model
   migrations/       Auto-generated SQL migration history — commit these
+  seed.ts           Seed script — upserts dev/test users
 ```
 
 ## Commands
@@ -81,7 +90,53 @@ prisma/
 | `npm run db:migrate -- --name <name>` | Create and apply a new migration                                |
 | `npm run db:reset`                    | Drop DB and re-apply all existing migrations                    |
 | `npm run db:fresh`                    | Wipe migration history + reset DB + create clean init migration |
-| `npm run db:studio`                   | Open Prisma Studio (browser DB viewer) at localhost:5555        |
+| `npm run db:studio`                   | Open Prisma Studio (browser DB viewer)                          |
+| `npm run db:seed`                     | Seed the database with dev users (idempotent)                   |
+| `npm run db:migrate:test`             | Run migrations against the test database                        |
+
+### Testing
+
+| Command              | Description                  |
+| -------------------- | ---------------------------- |
+| `npm run test`       | Run all tests                |
+| `npm run test:watch` | Run tests in watch mode      |
+
+### Code
+
+| Command           | Description                        |
+| ----------------- | ---------------------------------- |
+| `npm run format`  | Format all TypeScript files        |
+
+## Seed Data
+
+Run `npm run db:seed` to populate the database with two default users:
+
+| Email             | Password | Role    |
+| ----------------- | -------- | ------- |
+| `test@abv.bg`     | `1234`   | `user`  |
+| `admin@abv.bg`    | `1234`   | `admin` |
+
+The seed is idempotent — safe to run multiple times.
+
+## Testing
+
+Tests use **Vitest** (test runner) and **Supertest** (HTTP assertions against the real Express app).
+
+Integration tests hit a real database. Set up the test database once before running tests:
+
+```bash
+# 1. Create a separate test DB in Postgres (e.g. scaffold_test)
+# 2. Copy .env and point DATABASE_URL at the test DB
+cp .env .env.test
+
+# 3. Apply migrations to the test DB
+npm run db:migrate:test
+
+# 4. Run tests
+npm run test
+```
+
+Tests clear relevant tables in `beforeEach` — no manual cleanup needed between runs.
 
 ## Adding a New Model
 
@@ -103,7 +158,7 @@ This deletes all migration files, drops the database, and creates a single fresh
 
 ## Deployment Notes
 
-- Set `NODE_ENV=production` in your hosting environment (DigitalOcean App Platform → Environment Variables, PM2 config, etc.)
-- This is required to prevent dev-only scripts like `db:fresh` from running in production
+- Set `NODE_ENV=production` in your hosting environment
+- This gates the `secure` flag on the refresh token cookie — required for HTTPS
 - Replace `DATABASE_URL` with your managed database connection string
 - `docker-compose.yml` is for local dev only — do not use it in production

@@ -7,14 +7,18 @@
 	"type": "module",
 	"main": "index.js",
 	"scripts": {
+		"dev": "nodemon --exec tsx --env-file .env --ext ts src/index.ts",
+		"predev": "docker compose up -d",
 		"docker:up": "docker compose up -d",
 		"docker:stop": "docker compose stop",
 		"db:migrate": "prisma migrate dev",
+		"db:migrate:test": "dotenv -e .env.test -- prisma migrate deploy",
 		"db:reset": "prisma migrate reset",
 		"db:fresh": "node scripts/db-fresh.mjs",
+		"db:seed": "prisma db seed",
 		"db:studio": "prisma studio",
-		"predev": "docker compose up -d",
-		"dev": "nodemon --exec tsx --env-file .env --ext ts src/index.ts",
+		"test": "vitest run",
+		"test:watch": "vitest",
 		"format": "prettier --write \"src/**/*.ts\""
 	},
 	"prisma": {
@@ -30,6 +34,8 @@
 		"express-rate-limit": "^8.5.2",
 		"jsonwebtoken": "^9.0.3",
 		"pg": "^8.21.0",
+		"supertest": "^7.2.2",
+		"vitest": "^4.1.8",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
@@ -40,7 +46,9 @@
 		"@types/jsonwebtoken": "^9.0.10",
 		"@types/node": "^25.9.1",
 		"@types/pg": "^8.20.0",
+		"@types/supertest": "^7.2.0",
 		"dotenv": "^17.4.2",
+		"dotenv-cli": "^11.0.0",
 		"nodemon": "^3.1.14",
 		"prettier": "^3.8.3",
 		"prisma": "^7.8.0",
