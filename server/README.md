@@ -29,14 +29,17 @@ npm run dev
 
 ## Environment Variables
 
-| Variable             | Description                                     |
-| -------------------- | ----------------------------------------------- |
-| `PORT`               | Port the server listens on                      |
-| `ORIGIN`             | Allowed CORS origin (frontend URL)              |
-| `DATABASE_URL`       | PostgreSQL connection string                    |
-| `JWT_ACCESS_SECRET`  | Secret used to sign access tokens (15 min)      |
-| `JWT_REFRESH_SECRET` | Secret used to sign refresh tokens (7 d)        |
-| `NODE_ENV`           | Set to `production` on deploy (gates secure cookie) |
+| Variable               | Description                                     |
+| ---------------------- | ----------------------------------------------- |
+| `PORT`                 | Port the server listens on                      |
+| `ORIGIN`               | Allowed CORS origin (frontend URL)              |
+| `DATABASE_URL`         | PostgreSQL connection string                    |
+| `JWT_ACCESS_SECRET`    | Secret used to sign access tokens (15 min)      |
+| `JWT_REFRESH_SECRET`   | Secret used to sign refresh tokens (7 d)        |
+| `NODE_ENV`             | Set to `production` on deploy (gates secure cookie) |
+| `GOOGLE_CLIENT_ID`     | Google OAuth client ID                              |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret                        |
+| `GOOGLE_REDIRECT_URI`  | Must match authorized redirect URI in Google Cloud Console |
 
 `DATABASE_URL` format: `postgresql://USER:PASSWORD@localhost:5432/DBNAME`
 
