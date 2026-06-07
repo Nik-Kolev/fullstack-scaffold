@@ -9,6 +9,7 @@ Express + TypeScript REST API with Prisma ORM and PostgreSQL.
 - **ORM:** Prisma 7
 - **Database:** PostgreSQL (Docker in dev, managed service in prod)
 - **Auth:** JWT — access token (15 min) + refresh token (7 d, httpOnly cookie)
+- **Cache:** Redis 7 (ioredis) — response caching, BullMQ backend
 - **Validation:** Zod v4
 - **Hashing:** bcrypt v6
 
@@ -40,6 +41,7 @@ npm run dev
 | `GOOGLE_CLIENT_ID`     | Google OAuth client ID                              |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret                        |
 | `GOOGLE_REDIRECT_URI`  | Must match authorized redirect URI in Google Cloud Console |
+| `REDIS_URL`            | Redis connection string (`redis://localhost:6379` in dev) |
 
 `DATABASE_URL` format: `postgresql://USER:PASSWORD@localhost:5432/DBNAME`
 
@@ -55,10 +57,10 @@ src/
   routes/           Route definitions — maps URLs to controllers
   controllers/      Thin handlers — call service, set cookie, send response
   services/         All DB and business logic
-  middleware/       errorHandler, validateBody, isAuthenticated, requireRole, rateLimiter
+  middleware/       errorHandler, validateBody, isAuthenticated, requireRole, rateLimiter, redisCache
   schemas/          Zod schemas — one file per domain
   types/            TypeScript augmentations (env.d.ts, express.d.ts)
-  lib/              Third-party singletons (prisma.ts, jwt.ts)
+  lib/              Third-party singletons (prisma.ts, jwt.ts, redis.ts)
   generated/        Auto-generated Prisma client — do not edit
   __tests__/        Integration tests
 
