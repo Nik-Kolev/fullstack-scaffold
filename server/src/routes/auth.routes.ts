@@ -15,5 +15,7 @@ router.post(
 router.post('/login', authLimiter, validateBody(authSchemas.loginSchema), authController.loginUser);
 router.post('/logout', authController.logoutUser);
 router.post('/refresh', authController.refreshToken);
+router.get('/google', authController.googleRedirect);
+router.get('/google/callback', authController.googleCallback);
 
 export default router;

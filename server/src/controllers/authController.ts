@@ -71,3 +71,23 @@ export const refreshToken = async (req: Request, res: Response) => {
 		throw err;
 	}
 };
+
+export const googleRedirect = (req: Request, res: Response) => {
+	const url = userService.getGoogleAuthUrl();
+	res.redirect(url);
+};
+
+export const googleCallback = async (req: Request, res: Response) => {
+	const code = req.query.code as string;
+
+	const { accessToken, refreshToken } = await userService.handleGoogleCallback(code);
+
+	res.cookie('refreshToken', refreshToken.token, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: 'strict',
+		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
+	});
+
+	res.redirect(`${process.env.ORIGIN}?accessToken=${accessToken}`);
+};
