@@ -3,6 +3,7 @@ import * as authController from '../controllers/authController.js';
 import validateBody from '../middleware/validateBody.js';
 import * as authSchemas from '../schemas/auth.schema.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
+import { redisCache } from '../middleware/redisCache.js';
 
 const router = Router();
 

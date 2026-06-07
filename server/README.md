@@ -97,7 +97,8 @@ prisma/
 | `npm run db:fresh`                    | Wipe migration history + reset DB + create clean init migration |
 | `npm run db:studio`                   | Open Prisma Studio (browser DB viewer)                          |
 | `npm run db:seed`                     | Seed the database with dev users (idempotent)                   |
-| `npm run db:migrate:test`             | Run migrations against the test database                        |
+| `npm run db:migrate:test`             | Apply new migrations to the test database                       |
+| `npm run db:reset:test`               | Wipe and rebuild the test database (use after `db:fresh`)       |
 
 ### Testing
 
@@ -141,7 +142,9 @@ npm run db:migrate:test
 npm run test
 ```
 
-Tests clear relevant tables in `beforeEach` — no manual cleanup needed between runs.
+Tests clear relevant tables and Redis state in `beforeEach` — no manual cleanup needed between runs.
+
+> If the test DB gets out of sync with the schema (e.g. after running `db:fresh` on the main DB), run `npm run db:reset:test` to wipe and rebuild it.
 
 ## Adding a New Model
 

@@ -5,6 +5,7 @@ import CustomError from '../utils/customError.js';
 import bcrypt from 'bcrypt';
 import OAuth2Client from '../lib/google.js';
 import { google } from 'googleapis';
+import redis from '../lib/redis.js';
 
 export const createUser = async (data: Prisma.UserCreateInput) => {
 	const { password, ...rest } = data;
@@ -130,4 +131,10 @@ export const handleGoogleCallback = async (code: string) => {
 	});
 
 	return { accessToken, refreshToken };
+};
+
+export const blacklistToken = async (jti: string, exp: number) => {
+	const ttl = exp - Math.floor(Date.now() / 1000);
+	if (ttl > 0) await redis.setex(`blacklist:${jti}`, ttl, 'true');
+	//instead of true it can be 1 - does not matter, the value here is not needed
 };

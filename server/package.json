@@ -13,6 +13,7 @@
 		"docker:stop": "docker compose stop",
 		"db:migrate": "prisma migrate dev",
 		"db:migrate:test": "dotenv -e .env.test -- prisma migrate deploy",
+		"db:reset:test": "dotenv -e .env.test -- prisma migrate reset --force",
 		"db:reset": "prisma migrate reset",
 		"db:fresh": "node scripts/db-fresh.mjs",
 		"db:seed": "prisma db seed",

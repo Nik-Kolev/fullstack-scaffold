@@ -40,6 +40,18 @@ export const logoutUser = async (req: Request, res: Response) => {
 		await userService.logoutUser(token.refreshTokenId!);
 	}
 
+	const authHeader = req.headers.authorization;
+	const accessToken = authHeader?.split(' ')[1];
+
+	if (accessToken) {
+		try {
+			const payload = JWT.verifyToken('access', accessToken);
+			await userService.blacklistToken(payload.jti!, payload.exp!);
+		} catch (err) {
+			// token is expired - nothing to blacklist
+		}
+	}
+
 	res.clearCookie('refreshToken');
 	res.sendStatus(204);
 };

@@ -3,11 +3,16 @@ import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { isAuth } from '../middleware/isAuthenticated.js';
 import { requireRole } from '../middleware/requireRole.js';
 import errorHandler from '../middleware/errorHandler.js';
 import CustomError from '../utils/customError.js';
+import redis from '../lib/redis.js';
+
+afterAll(async () => {
+	await redis.quit();
+});
 
 // ─── Shared test app ─────────────────────────────────────────────────────────
 
@@ -20,9 +25,9 @@ app.use(errorHandler);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeToken(role: string = 'user') {
+function makeToken(role: string = 'user', jti: string = crypto.randomUUID()) {
 	return jwt.sign(
-		{ userId: 1, email: 'test@example.com', role },
+		{ userId: 1, email: 'test@example.com', role, jti },
 		process.env.JWT_ACCESS_SECRET!,
 		{ expiresIn: '15m' },
 	);
@@ -67,6 +72,16 @@ describe('isAuthenticated middleware', () => {
 
 		expect(res.status).toBe(200);
 		expect(res.body.user).toMatchObject({ userId: 1, email: 'test@example.com', role: 'user' });
+	});
+
+	it('returns 401 for a blacklisted token', async () => {
+		const jti = crypto.randomUUID();
+		const token = makeToken('user', jti);
+		await redis.setex(`blacklist:${jti}`, 900, '1');
+
+		const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
+
+		expect(res.status).toBe(401);
 	});
 });
 

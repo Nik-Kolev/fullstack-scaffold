@@ -1,9 +1,18 @@
 import request from 'supertest';
+import express from 'express';
 import app from '../app.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import prisma from '../lib/prisma.js';
+import redis from '../lib/redis.js';
+import { isAuth } from '../middleware/isAuthenticated.js';
+import errorHandler from '../middleware/errorHandler.js';
 
 const TEST_USER = { email: 'test@example.com', password: 'Test1234', name: 'Tester' };
+
+// Mini app used to test that blacklisted tokens are rejected by isAuth
+const protectedApp = express();
+protectedApp.get('/protected', isAuth, (_req, res) => res.sendStatus(200));
+protectedApp.use(errorHandler);
 
 function getCookies(res: request.Response): string[] {
 	const val = res.headers['set-cookie'];
@@ -24,10 +33,12 @@ async function login() {
 beforeEach(async () => {
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();
+	await redis.flushdb();
 });
 
 afterAll(async () => {
 	await prisma.$disconnect();
+	await redis.quit();
 });
 
 // ─── Register ────────────────────────────────────────────────────────────────
@@ -212,5 +223,49 @@ describe('POST /api/auth/logout', () => {
 		const res = await request(app).post('/api/auth/refresh').set('Cookie', cookie);
 
 		expect(res.status).toBe(401);
+	});
+
+	it('blacklists the access token in Redis on logout', async () => {
+		await register();
+		const loginRes = await login();
+		const cookie = getCookies(loginRes).join('; ');
+		const { accessToken } = loginRes.body;
+
+		await request(app)
+			.post('/api/auth/logout')
+			.set('Cookie', cookie)
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		const keys = await redis.keys('blacklist:*');
+		expect(keys.length).toBe(1);
+	});
+
+	it('returns 401 on protected route when access token is blacklisted', async () => {
+		await register();
+		const loginRes = await login();
+		const cookie = getCookies(loginRes).join('; ');
+		const { accessToken } = loginRes.body;
+
+		await request(app)
+			.post('/api/auth/logout')
+			.set('Cookie', cookie)
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		const res = await request(protectedApp)
+			.get('/protected')
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		expect(res.status).toBe(401);
+	});
+
+	it('does not blacklist anything when no access token is sent on logout', async () => {
+		await register();
+		const loginRes = await login();
+		const cookie = getCookies(loginRes).join('; ');
+
+		await request(app).post('/api/auth/logout').set('Cookie', cookie);
+
+		const keys = await redis.keys('blacklist:*');
+		expect(keys.length).toBe(0);
 	});
 });
