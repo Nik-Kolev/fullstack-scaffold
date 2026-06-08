@@ -1,8 +1,16 @@
+import { tokenCleanupQueue } from './lib/bullmq.js';
 import prisma from './lib/prisma.js';
 import * as workers from './workers/index.js';
 
 async function start() {
 	await prisma.$connect();
+	await tokenCleanupQueue.add(
+		'deleteExpiredTokens',
+		{},
+		{
+			repeat: { pattern: '0 3 * * *' },
+		},
+	);
 	console.log('Worker process started');
 }
 

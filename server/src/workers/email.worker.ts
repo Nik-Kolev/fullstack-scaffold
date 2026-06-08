@@ -1,5 +1,5 @@
-import { Worker, Job } from 'bullmq';
-import { redisConnectionOptions } from '../lib/redis.js';
+import { Job } from 'bullmq';
+import { createWorker } from '../lib/bullmq.js';
 
 export async function handleEmailJob(job: Job) {
 	switch (job.name) {
@@ -9,8 +9,6 @@ export async function handleEmailJob(job: Job) {
 	}
 }
 
-const emailWorker = new Worker('emails', handleEmailJob, {
-	connection: redisConnectionOptions,
-});
+const emailWorker = createWorker('emails', handleEmailJob);
 
 export default emailWorker;
