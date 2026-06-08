@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 
-const { hostname: host, port: rawPort } = new URL(process.env.REDIS_URL as string);
+const { hostname: host, port: rawPort } = new URL(process.env.REDIS_URL);
 
 export const redisConnectionOptions = {
 	host,
@@ -8,6 +8,6 @@ export const redisConnectionOptions = {
 	maxRetriesPerRequest: null as null,
 };
 
-const redis = new Redis(process.env.REDIS_URL as string);
+const redis = new Redis(process.env.REDIS_URL);
 
 export default redis;

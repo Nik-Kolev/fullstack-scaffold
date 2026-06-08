@@ -6,5 +6,10 @@ declare namespace NodeJS {
 		JWT_ACCESS_SECRET: string;
 		JWT_REFRESH_SECRET: string;
 		NODE_ENV: string;
+		GOOGLE_CLIENT_ID: string;
+		GOOGLE_CLIENT_SECRET: string;
+		GOOGLE_REDIRECT_URI: string;
+		REDIS_URL: string;
+		RESEND_API_KEY: string;
 	}
 }
