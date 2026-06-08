@@ -3,9 +3,10 @@ import type { Prisma } from '../generated/prisma/index.js';
 import * as JWT from '../lib/jwt.js';
 import CustomError from '../utils/customError.js';
 import bcrypt from 'bcrypt';
-import OAuth2Client from '../lib/google.js';
+import OAuth2Client from '../lib/googleOAuth.js';
 import { google } from 'googleapis';
 import redis from '../lib/redis.js';
+import { emailQueue } from '../lib/bullmq.js';
 
 export const createUser = async (data: Prisma.UserCreateInput) => {
 	const { password, ...rest } = data;
@@ -25,6 +26,8 @@ export const createUser = async (data: Prisma.UserCreateInput) => {
 			expiresAt: refreshToken.expiryDate,
 		},
 	});
+
+	await emailQueue.add('welcome', { email: user.email, userId: user.id });
 
 	return { user, accessToken, refreshToken };
 };

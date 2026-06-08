@@ -1,11 +1,15 @@
 import request from 'supertest';
 import express from 'express';
 import app from '../app.js';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '../lib/prisma.js';
 import redis from '../lib/redis.js';
 import { isAuth } from '../middleware/isAuthenticated.js';
 import errorHandler from '../middleware/errorHandler.js';
+
+vi.mock('../lib/bullmq.js', () => ({
+	emailQueue: { add: vi.fn() },
+}));
 
 const TEST_USER = { email: 'test@example.com', password: 'Test1234', name: 'Tester' };
 

@@ -20,6 +20,7 @@
 		"db:studio": "prisma studio",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"worker": "nodemon --exec tsx --env-file .env --ext ts src/worker.ts",
 		"format": "prettier --write \"src/**/*.ts\""
 	},
 	"prisma": {
@@ -29,6 +30,7 @@
 		"@prisma/adapter-pg": "^7.8.0",
 		"@prisma/client": "^7.8.0",
 		"bcrypt": "^6.0.0",
+		"bullmq": "^5.78.0",
 		"cookie-parser": "^1.4.7",
 		"cors": "^2.8.6",
 		"express": "^5.2.1",

@@ -53,6 +53,7 @@ The credentials must match the values in the root `.env` used by Docker Compose.
 src/
   app.ts            App factory — middleware, routes, error handler (no listen)
   index.ts          Entry point — imports app, calls app.listen()
+  worker.ts         Worker process entry point — starts all BullMQ workers
   config/           Express middleware setup (cors, json, cookieParser, rate limiter)
   routes/           Route definitions — maps URLs to controllers
   controllers/      Thin handlers — call service, set cookie, send response
@@ -60,7 +61,8 @@ src/
   middleware/       errorHandler, validateBody, isAuthenticated, requireRole, rateLimiter, redisCache
   schemas/          Zod schemas — one file per domain
   types/            TypeScript augmentations (env.d.ts, express.d.ts)
-  lib/              Third-party singletons (prisma.ts, jwt.ts, redis.ts)
+  lib/              Third-party singletons (prisma.ts, jwt.ts, redis.ts, bullmq.ts, googleOAuth.ts)
+  workers/          BullMQ worker definitions — one file per domain; index.ts barrel-exports all
   generated/        Auto-generated Prisma client — do not edit
   __tests__/        Integration tests
 
@@ -77,9 +79,10 @@ prisma/
 
 ### Dev
 
-| Command       | Description                                       |
-| ------------- | ------------------------------------------------- |
-| `npm run dev` | Start dev server with hot reload (auto-starts DB) |
+| Command            | Description                                            |
+| ------------------ | ------------------------------------------------------ |
+| `npm run dev`      | Start HTTP server with hot reload (auto-starts DB)     |
+| `npm run worker`   | Start BullMQ worker process with hot reload            |
 
 ### Docker
 
