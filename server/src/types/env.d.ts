@@ -1,3 +1,5 @@
+import type { string } from 'zod';
+
 declare namespace NodeJS {
 	interface ProcessEnv {
 		PORT: string;
@@ -11,5 +13,7 @@ declare namespace NodeJS {
 		GOOGLE_REDIRECT_URI: string;
 		REDIS_URL: string;
 		RESEND_API_KEY: string;
+		RESEND_FROM: string;
+		RESEND_REPLY_TO: string;
 	}
 }

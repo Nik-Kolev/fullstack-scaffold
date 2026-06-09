@@ -27,7 +27,7 @@ export const createUser = async (data: Prisma.UserCreateInput) => {
 		},
 	});
 
-	await emailQueue.add('welcome', { email: user.email, userId: user.id });
+	await emailQueue.add('welcome', { name: user.name, email: user.email });
 
 	return { user, accessToken, refreshToken };
 };
