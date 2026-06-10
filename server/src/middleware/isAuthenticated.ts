@@ -16,7 +16,13 @@ export async function isAuth(req: Request, _res: Response, next: NextFunction) {
 	const blacklisted = await redis.get(`blacklist:${payload.jti}`);
 	if (blacklisted) throw new CustomError(401, 'Unauthorized.');
 
-	req.user = { userId: payload.userId, email: payload.email, role: payload.role };
+	req.user = {
+		userId: payload.userId,
+		email: payload.email,
+		role: payload.role,
+		jti: payload.jti as string,
+		exp: payload.exp as number,
+	};
 
 	next();
 }

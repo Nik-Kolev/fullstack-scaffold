@@ -141,3 +141,44 @@ export const blacklistToken = async (jti: string, exp: number) => {
 	if (ttl > 0) await redis.setex(`blacklist:${jti}`, ttl, 'true');
 	//instead of true it can be 1 - does not matter, the value here is not needed
 };
+
+export const changePassword = async (
+	userId: number,
+	currentPassword: string | undefined,
+	newPassword: string,
+) => {
+	const user = await prisma.user.findUnique({ where: { id: userId } });
+
+	if (!user) {
+		throw new CustomError(401, 'Session is invalid, please log in again.');
+		// edge case, if user is deleted in the future and accessToken is still active
+	}
+
+	if (user.password) {
+		if (!currentPassword) {
+			throw new CustomError(400, 'Current password is required.');
+		}
+		const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+		if (!isPasswordValid) {
+			throw new CustomError(401, 'Current password is incorrect.');
+		}
+	}
+
+	const newHashedPassword = await bcrypt.hash(newPassword, 10);
+	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
+
+	await prisma.$transaction([
+		prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
+		prisma.user.update({ where: { id: user.id }, data: { password: newHashedPassword } }),
+		prisma.refreshToken.create({
+			data: {
+				userId: user.id,
+				refreshTokenId: refreshToken.refreshTokenId!,
+				expiresAt: refreshToken.expiryDate,
+			},
+		}),
+	]);
+
+	const { password: _, ...safeUser } = user;
+	return { accessToken, refreshToken, user: { ...safeUser, hasPassword: true } };
+};

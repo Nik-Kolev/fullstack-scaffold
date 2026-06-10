@@ -103,3 +103,29 @@ export const googleCallback = async (req: Request, res: Response) => {
 
 	res.redirect(`${process.env.ORIGIN}?accessToken=${accessToken}`);
 };
+
+export const changePassword = async (req: Request, res: Response) => {
+	const userId = req.user!.userId;
+	const { currentPassword, newPassword } = req.body;
+
+	const { user, accessToken, refreshToken } = await userService.changePassword(
+		userId,
+		currentPassword,
+		newPassword,
+	);
+
+	try {
+		await userService.blacklistToken(req.user!.jti, req.user!.exp);
+	} catch (_) {
+		// Redis failure — old token expires naturally within 15 min
+	}
+
+	res.cookie('refreshToken', refreshToken.token, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: 'strict',
+		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
+	});
+
+	res.status(200).json({ user, accessToken, message: 'Password changed successfully.' });
+};
