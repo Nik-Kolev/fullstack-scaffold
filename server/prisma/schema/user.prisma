@@ -4,8 +4,10 @@ model User {
     password      String?
     name          String
     role          String         @default("user")
-    googleId      String?        @unique
-    createdAt     DateTime       @default(now())
-    updatedAt     DateTime       @updatedAt
+    googleId      String?        @unique @map("google_id")
+    createdAt     DateTime       @default(now()) @map("created_at")
+    updatedAt     DateTime       @updatedAt @map("updated_at")
     refreshTokens RefreshToken[]
+
+    @@map("users")
 }

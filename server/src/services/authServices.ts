@@ -8,13 +8,12 @@ import { google } from 'googleapis';
 import redis from '../lib/redis.js';
 import { emailQueue } from '../lib/bullmq.js';
 
-export const createUser = async (data: Prisma.UserCreateInput) => {
+export const createUser = async (data: Prisma.UserCreateInput & { password: string }) => {
 	const { password, ...rest } = data;
-	const hashedPassword = await bcrypt.hash(password!, 10);
+	const hashedPassword = await bcrypt.hash(password, 10);
 
 	const user = await prisma.user.create({
 		data: { ...rest, password: hashedPassword },
-		omit: { password: true },
 	});
 
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
@@ -33,7 +32,7 @@ export const createUser = async (data: Prisma.UserCreateInput) => {
 };
 
 export const loginUser = async (email: string, password: string) => {
-	const userMatch = await prisma.user.findUnique({ where: { email } });
+	const userMatch = await prisma.user.findUnique({ where: { email }, omit: { password: false } });
 
 	if (!userMatch) {
 		throw new CustomError(
@@ -74,20 +73,20 @@ export const loginUser = async (email: string, password: string) => {
 };
 
 export const logoutUser = async (refreshTokenId: string) => {
-	await prisma.refreshToken.delete({ where: { refreshTokenId } });
+	await prisma.refreshToken.deleteMany({ where: { refreshTokenId } });
 };
 
 export const refreshToken = async (
 	refreshTokenId: string,
 	user: { id: number; email: string; role: string },
 ) => {
-	const existing = await prisma.refreshToken.findUnique({ where: { refreshTokenId } });
+	const deleted = await prisma.refreshToken.deleteMany({
+		where: { refreshTokenId, expiresAt: { gt: new Date() } },
+	});
 
-	if (!existing || existing.expiresAt < new Date()) {
+	if (deleted.count === 0) {
 		throw new CustomError(401, 'Invalid or expired refresh token.');
 	}
-
-	await prisma.refreshToken.delete({ where: { refreshTokenId } });
 
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
 
@@ -118,9 +117,8 @@ export const handleGoogleCallback = async (code: string) => {
 		create: {
 			googleId: data.id as string,
 			email: data.email as string,
-			name: data.name as string,
+			name: data.name ?? data.email?.split('@')[0] ?? 'User',
 		},
-		omit: { password: true },
 	});
 
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
@@ -147,7 +145,7 @@ export const changePassword = async (
 	currentPassword: string | undefined,
 	newPassword: string,
 ) => {
-	const user = await prisma.user.findUnique({ where: { id: userId } });
+	const user = await prisma.user.findUnique({ where: { id: userId }, omit: { password: false } });
 
 	if (!user) {
 		throw new CustomError(401, 'Session is invalid, please log in again.');

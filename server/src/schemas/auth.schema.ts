@@ -10,7 +10,7 @@ export const registerSchema = z.object({
 			passwordRegex,
 			'Password must be at least 8 characters long, contain at least one letter and one number',
 		),
-	name: z.string().min(1, 'Name is required.').optional(),
+	name: z.string().min(1, 'Name is required.'),
 });
 
 export const loginSchema = z.object({

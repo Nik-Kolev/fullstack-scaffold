@@ -1,7 +1,9 @@
 model RefreshToken {
-    refreshTokenId String   @id
-    userId         Int
-    expiresAt      DateTime
-    createdAt      DateTime @default(now())
-    user           User     @relation(fields: [userId], references: [id])
+    refreshTokenId String   @id @map("refresh_token_id")
+    userId         Int      @map("user_id")
+    expiresAt      DateTime @map("expires_at")
+    createdAt      DateTime @default(now()) @map("created_at")
+    user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("refresh_tokens")
 }
