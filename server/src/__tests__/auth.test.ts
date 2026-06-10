@@ -6,6 +6,7 @@ import prisma from '../lib/prisma.js';
 import redis from '../lib/redis.js';
 import { isAuth } from '../middleware/isAuthenticated.js';
 import errorHandler from '../middleware/errorHandler.js';
+import * as JWT from '../lib/jwt.js';
 
 vi.mock('../lib/bullmq.js', () => ({
 	emailQueue: { add: vi.fn() },
@@ -271,5 +272,158 @@ describe('POST /api/auth/logout', () => {
 
 		const keys = await redis.keys('blacklist:*');
 		expect(keys.length).toBe(0);
+	});
+});
+
+// ─── Change Password ──────────────────────────────────────────────────────────
+
+describe('POST /api/auth/change-password', () => {
+	async function changePasswordReq(accessToken: string, body: object) {
+		return request(app)
+			.post('/api/auth/change-password')
+			.set('Authorization', `Bearer ${accessToken}`)
+			.send(body);
+	}
+
+	it('returns 200 with user, accessToken, and message', async () => {
+		await register();
+		const { body: { accessToken } } = await login();
+
+		const res = await changePasswordReq(accessToken, {
+			currentPassword: TEST_USER.password,
+			newPassword: 'NewPass5678',
+		});
+
+		expect(res.status).toBe(200);
+		expect(res.body).toHaveProperty('accessToken');
+		expect(res.body).toHaveProperty('message');
+		expect(res.body.user).toMatchObject({ email: TEST_USER.email, hasPassword: true });
+		expect(res.body.user).not.toHaveProperty('password');
+	});
+
+	it('sets a new refreshToken cookie', async () => {
+		await register();
+		const { body: { accessToken } } = await login();
+
+		const res = await changePasswordReq(accessToken, {
+			currentPassword: TEST_USER.password,
+			newPassword: 'NewPass5678',
+		});
+
+		const cookies = getCookies(res);
+		expect(cookies.some((c) => c.startsWith('refreshToken='))).toBe(true);
+		expect(cookies.some((c) => c.toLowerCase().includes('httponly'))).toBe(true);
+	});
+
+	it('new refresh cookie can be used to refresh', async () => {
+		await register();
+		const { body: { accessToken } } = await login();
+
+		const changeRes = await changePasswordReq(accessToken, {
+			currentPassword: TEST_USER.password,
+			newPassword: 'NewPass5678',
+		});
+
+		const newCookie = getCookies(changeRes).join('; ');
+		const res = await request(app).post('/api/auth/refresh').set('Cookie', newCookie);
+
+		expect(res.status).toBe(200);
+		expect(res.body).toHaveProperty('accessToken');
+	});
+
+	it('invalidates old refresh token after password change', async () => {
+		await register();
+		const loginRes = await login();
+		const oldCookie = getCookies(loginRes).join('; ');
+		const { accessToken } = loginRes.body;
+
+		await changePasswordReq(accessToken, {
+			currentPassword: TEST_USER.password,
+			newPassword: 'NewPass5678',
+		});
+
+		const res = await request(app).post('/api/auth/refresh').set('Cookie', oldCookie);
+		expect(res.status).toBe(401);
+	});
+
+	it('blacklists old access token after password change', async () => {
+		await register();
+		const { body: { accessToken } } = await login();
+
+		await changePasswordReq(accessToken, {
+			currentPassword: TEST_USER.password,
+			newPassword: 'NewPass5678',
+		});
+
+		const res = await request(protectedApp)
+			.get('/protected')
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		expect(res.status).toBe(401);
+	});
+
+	it('allows password set without currentPassword when user has no password', async () => {
+		const googleUser = await prisma.user.create({
+			data: { email: 'google@example.com', name: 'Google User', googleId: 'google-uid-123' },
+		});
+		const { accessToken } = JWT.generateTokenPair(googleUser);
+
+		const res = await changePasswordReq(accessToken, { newPassword: 'NewPass5678' });
+
+		expect(res.status).toBe(200);
+		expect(res.body.user.hasPassword).toBe(true);
+	});
+
+	it('returns 401 for wrong currentPassword', async () => {
+		await register();
+		const { body: { accessToken } } = await login();
+
+		const res = await changePasswordReq(accessToken, {
+			currentPassword: 'WrongPass1',
+			newPassword: 'NewPass5678',
+		});
+
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 400 when currentPassword is missing but user has one', async () => {
+		await register();
+		const { body: { accessToken } } = await login();
+
+		const res = await changePasswordReq(accessToken, { newPassword: 'NewPass5678' });
+
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 when newPassword is the same as currentPassword', async () => {
+		await register();
+		const { body: { accessToken } } = await login();
+
+		const res = await changePasswordReq(accessToken, {
+			currentPassword: TEST_USER.password,
+			newPassword: TEST_USER.password,
+		});
+
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 for a weak newPassword', async () => {
+		await register();
+		const { body: { accessToken } } = await login();
+
+		const res = await changePasswordReq(accessToken, {
+			currentPassword: TEST_USER.password,
+			newPassword: 'weak',
+		});
+
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 401 when not authenticated', async () => {
+		const res = await request(app)
+			.post('/api/auth/change-password')
+			.send({ currentPassword: TEST_USER.password, newPassword: 'NewPass5678' });
+
+		expect(res.status).toBe(401);
 	});
 });

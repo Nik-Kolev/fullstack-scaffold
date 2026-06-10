@@ -3,6 +3,15 @@ import { emailQueue } from '../lib/bullmq.js';
 import emailWorker, { handleEmailJob } from '../workers/email.worker.js';
 import { Job, QueueEvents } from 'bullmq';
 import { redisConnectionOptions } from '../lib/redis.js';
+import { sendEmail } from '../lib/resend.js';
+
+vi.mock('../lib/resend.js', () => ({
+	sendEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@react-email/render', () => ({
+	render: vi.fn().mockResolvedValue('<html>mock</html>'),
+}));
 
 const queueEvents = new QueueEvents('emails', { connection: redisConnectionOptions });
 
@@ -14,13 +23,15 @@ describe('email worker', () => {
 	});
 
 	it('handles a welcome job', async () => {
-		const consoleSpy = vi.spyOn(console, 'log');
-		await handleEmailJob({ name: 'welcome', data: { email: 'test@example.com' } } as Job);
-		expect(consoleSpy).toHaveBeenCalledWith('Sending welcome email to', 'test@example.com');
+		await handleEmailJob({ name: 'welcome', data: { name: 'Test', email: 'test@example.com' } } as Job);
+
+		expect(vi.mocked(sendEmail)).toHaveBeenCalledWith(
+			expect.objectContaining({ to: 'test@example.com', subject: 'Welcome' }),
+		);
 	});
 
 	it('completes a welcome job end to end', async () => {
-		const job = await emailQueue.add('welcome', { email: 'test@example.com' });
+		const job = await emailQueue.add('welcome', { name: 'Test', email: 'test@example.com' });
 		await expect(job.waitUntilFinished(queueEvents)).resolves.not.toThrow();
 	});
 });
