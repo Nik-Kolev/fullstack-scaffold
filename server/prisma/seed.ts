@@ -25,7 +25,18 @@ async function seedData() {
 			name: 'admin',
 		},
 	});
-	console.log(user, admin);
+
+	const nik = await prisma.user.upsert({
+		where: { email: 'ngkolev93@gmail.com' },
+		update: {},
+		create: {
+			email: 'ngkolev93@gmail.com',
+			role: 'admin',
+			password: hashedPassword,
+			name: 'Nik',
+		},
+	});
+	console.log(user, admin, nik);
 }
 
 seedData()

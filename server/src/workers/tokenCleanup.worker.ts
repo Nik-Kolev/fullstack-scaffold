@@ -4,6 +4,7 @@ import { createWorker } from '../lib/bullmq.js';
 
 export async function handleTokenCleanupJob(_job: Job) {
 	await prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+	await prisma.passwordResetToken.deleteMany({ where: { expiresAt: { lt: new Date() } } });
 }
 
 const tokenCleanupWorker = createWorker('tokenCleanup', handleTokenCleanupJob);

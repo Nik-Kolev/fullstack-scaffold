@@ -7,6 +7,7 @@ import OAuth2Client from '../lib/googleOAuth.js';
 import { google } from 'googleapis';
 import redis from '../lib/redis.js';
 import { emailQueue } from '../lib/bullmq.js';
+import crypto from 'crypto';
 
 export const createUser = async (data: Prisma.UserCreateInput & { password: string }) => {
 	const { password, ...rest } = data;
@@ -179,4 +180,26 @@ export const changePassword = async (
 
 	const { password: _, ...safeUser } = user;
 	return { accessToken, refreshToken, user: { ...safeUser, hasPassword: true } };
+};
+
+export const createPasswordResetToken = async (email: string) => {
+	const user = await prisma.user.findUnique({ where: { email } });
+
+	if (!user) return;
+
+	const rawToken = crypto.randomBytes(32).toString('hex');
+	const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+	const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+	await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+
+	await prisma.passwordResetToken.create({
+		data: {
+			passwordResetToken: tokenHash,
+			userId: user.id,
+			expiresAt,
+		},
+	});
+
+	await emailQueue.add('password-reset', { name: user.name, email: user.email, token: rawToken });
 };

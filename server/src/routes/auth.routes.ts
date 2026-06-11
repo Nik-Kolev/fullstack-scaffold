@@ -24,5 +24,6 @@ router.post(
 	validateBody(authSchemas.changePasswordSchema),
 	authController.changePassword,
 );
+router.post('/forgot-password', authLimiter, validateBody(authSchemas.emailSchema), authController.forgotPassword);
 
 export default router;

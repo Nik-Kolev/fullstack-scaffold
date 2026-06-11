@@ -36,6 +36,7 @@ async function login() {
 }
 
 beforeEach(async () => {
+	await prisma.passwordResetToken.deleteMany();
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();
 	await redis.flushdb();
@@ -425,5 +426,62 @@ describe('POST /api/auth/change-password', () => {
 			.send({ currentPassword: TEST_USER.password, newPassword: 'NewPass5678' });
 
 		expect(res.status).toBe(401);
+	});
+});
+
+// ─── Forgot Password ──────────────────────────────────────────────────────────
+
+describe('POST /api/auth/forgot-password', () => {
+	async function forgotPassword(email: string) {
+		return request(app).post('/api/auth/forgot-password').send({ email });
+	}
+
+	it('returns 200 when user exists', async () => {
+		await register();
+		const res = await forgotPassword(TEST_USER.email);
+		expect(res.status).toBe(200);
+	});
+
+	it('returns 200 when user does not exist (never reveal email existence)', async () => {
+		const res = await forgotPassword('nobody@example.com');
+		expect(res.status).toBe(200);
+	});
+
+	it('creates a PasswordResetToken row in the DB when user exists', async () => {
+		await register();
+		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+
+		await forgotPassword(TEST_USER.email);
+
+		const token = await prisma.passwordResetToken.findFirst({ where: { userId: user!.id } });
+		expect(token).not.toBeNull();
+		expect(token!.expiresAt.getTime()).toBeGreaterThan(Date.now());
+	});
+
+	it('does not create a token when user does not exist', async () => {
+		await forgotPassword('nobody@example.com');
+
+		const count = await prisma.passwordResetToken.count();
+		expect(count).toBe(0);
+	});
+
+	it('replaces an existing token on a second request', async () => {
+		await register();
+		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+
+		await forgotPassword(TEST_USER.email);
+		const first = await prisma.passwordResetToken.findFirst({ where: { userId: user!.id } });
+
+		await forgotPassword(TEST_USER.email);
+		const second = await prisma.passwordResetToken.findFirst({ where: { userId: user!.id } });
+		const count = await prisma.passwordResetToken.count({ where: { userId: user!.id } });
+
+		expect(count).toBe(1);
+		expect(second!.passwordResetToken).not.toBe(first!.passwordResetToken);
+	});
+
+	it('returns 400 for invalid email format', async () => {
+		const res = await forgotPassword('not-an-email');
+		expect(res.status).toBe(400);
 	});
 });

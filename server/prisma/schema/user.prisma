@@ -1,13 +1,14 @@
 model User {
-    id            Int            @id @default(autoincrement())
-    email         String         @unique
-    password      String?
-    name          String
-    role          String         @default("user")
-    googleId      String?        @unique @map("google_id")
-    createdAt     DateTime       @default(now()) @map("created_at")
-    updatedAt     DateTime       @updatedAt @map("updated_at")
-    refreshTokens RefreshToken[]
+    id                  Int                  @id @default(autoincrement())
+    email               String               @unique
+    password            String?
+    name                String
+    role                String               @default("user")
+    googleId            String?              @unique @map("google_id")
+    createdAt           DateTime             @default(now()) @map("created_at")
+    updatedAt           DateTime             @updatedAt @map("updated_at")
+    refreshTokens       RefreshToken[]
+    passwordResetTokens PasswordResetToken[]
 
     @@map("users")
 }

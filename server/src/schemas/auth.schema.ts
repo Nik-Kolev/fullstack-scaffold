@@ -37,3 +37,7 @@ export const changePasswordSchema = z
 			path: ['newPassword'],
 		},
 	);
+
+export const emailSchema = z.object({
+	email: z.email('Invalid email format.'),
+});
