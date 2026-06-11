@@ -41,3 +41,13 @@ export const changePasswordSchema = z
 export const emailSchema = z.object({
 	email: z.email('Invalid email format.'),
 });
+
+export const resetPasswordSchema = z.object({
+	token: z.string().min(1),
+	newPassword: z
+		.string()
+		.regex(
+			passwordRegex,
+			'Password must be at least 8 characters long, contain at least one letter and one number',
+		),
+});

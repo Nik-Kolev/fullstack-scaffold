@@ -24,6 +24,17 @@ router.post(
 	validateBody(authSchemas.changePasswordSchema),
 	authController.changePassword,
 );
-router.post('/forgot-password', authLimiter, validateBody(authSchemas.emailSchema), authController.forgotPassword);
+router.post(
+	'/forgot-password',
+	authLimiter,
+	validateBody(authSchemas.emailSchema),
+	authController.forgotPassword,
+);
+router.post(
+	'/reset-password',
+	authLimiter,
+	validateBody(authSchemas.resetPasswordSchema),
+	authController.resetPassword,
+);
 
 export default router;

@@ -7,6 +7,7 @@ import redis from '../lib/redis.js';
 import { isAuth } from '../middleware/isAuthenticated.js';
 import errorHandler from '../middleware/errorHandler.js';
 import * as JWT from '../lib/jwt.js';
+import * as authService from '../services/authServices.js';
 
 vi.mock('../lib/bullmq.js', () => ({
 	emailQueue: { add: vi.fn() },
@@ -426,6 +427,102 @@ describe('POST /api/auth/change-password', () => {
 			.send({ currentPassword: TEST_USER.password, newPassword: 'NewPass5678' });
 
 		expect(res.status).toBe(401);
+	});
+});
+
+// ─── Reset Password ───────────────────────────────────────────────────────────
+
+describe('POST /api/auth/reset-password', () => {
+	async function resetPassword(token: string, newPassword: string) {
+		return request(app).post('/api/auth/reset-password').send({ token, newPassword });
+	}
+
+	async function getResetToken(): Promise<string> {
+		await register();
+		return (await authService.forgotPassword(TEST_USER.email))!;
+	}
+
+	it('returns 200 with user, accessToken, and message', async () => {
+		const token = await getResetToken();
+		const res = await resetPassword(token, 'NewPass5678');
+
+		expect(res.status).toBe(200);
+		expect(res.body).toHaveProperty('accessToken');
+		expect(res.body).toHaveProperty('message');
+		expect(res.body.user).toMatchObject({ email: TEST_USER.email });
+		expect(res.body.user).not.toHaveProperty('password');
+	});
+
+	it('sets a new refreshToken cookie', async () => {
+		const token = await getResetToken();
+		const res = await resetPassword(token, 'NewPass5678');
+
+		const cookies = getCookies(res);
+		expect(cookies.some((c) => c.startsWith('refreshToken='))).toBe(true);
+		expect(cookies.some((c) => c.toLowerCase().includes('httponly'))).toBe(true);
+	});
+
+	it('deletes the reset token row after use', async () => {
+		const token = await getResetToken();
+		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+
+		await resetPassword(token, 'NewPass5678');
+
+		const row = await prisma.passwordResetToken.findFirst({ where: { userId: user!.id } });
+		expect(row).toBeNull();
+	});
+
+	it('token cannot be reused after a successful reset', async () => {
+		const token = await getResetToken();
+		await resetPassword(token, 'NewPass5678');
+
+		const res = await resetPassword(token, 'AnotherPass99');
+		expect(res.status).toBe(401);
+	});
+
+	it('invalidates all existing refresh tokens on reset', async () => {
+		const loginRes = await login();
+		const oldCookie = getCookies(loginRes).join('; ');
+
+		const token = await authService.forgotPassword(TEST_USER.email) as string;
+		await resetPassword(token, 'NewPass5678');
+
+		const res = await request(app).post('/api/auth/refresh').set('Cookie', oldCookie);
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 401 for an invalid token', async () => {
+		const res = await resetPassword('invalidtoken', 'NewPass5678');
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 401 for an expired token', async () => {
+		await register();
+		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+
+		await prisma.passwordResetToken.create({
+			data: {
+				passwordResetToken: 'expiredhash',
+				userId: user!.id,
+				expiresAt: new Date(Date.now() - 1000),
+			},
+		});
+
+		const res = await resetPassword('somerawtoken', 'NewPass5678');
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 400 for a weak newPassword', async () => {
+		const token = await getResetToken();
+		const res = await resetPassword(token, 'weak');
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 when token is missing', async () => {
+		const res = await request(app)
+			.post('/api/auth/reset-password')
+			.send({ newPassword: 'NewPass5678' });
+		expect(res.status).toBe(400);
 	});
 });
 

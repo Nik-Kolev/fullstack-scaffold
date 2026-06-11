@@ -133,9 +133,24 @@ export const changePassword = async (req: Request, res: Response) => {
 export const forgotPassword = async (req: Request, res: Response) => {
 	const email = req.body.email;
 
-	await authService.createPasswordResetToken(email);
+	await authService.forgotPassword(email);
 
 	res.status(200).json({
 		message: 'If an account with that email exists, a password reset link has been send.',
 	});
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+	const { token, newPassword } = req.body;
+
+	const { user, accessToken, refreshToken } = await authService.resetPassword(token, newPassword);
+
+	res.cookie('refreshToken', refreshToken.token, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: 'strict',
+		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
+	});
+
+	res.status(200).json({ user, accessToken, message: 'Password changed successfully.' });
 };

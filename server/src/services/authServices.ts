@@ -182,7 +182,7 @@ export const changePassword = async (
 	return { accessToken, refreshToken, user: { ...safeUser, hasPassword: true } };
 };
 
-export const createPasswordResetToken = async (email: string) => {
+export const forgotPassword = async (email: string) => {
 	const user = await prisma.user.findUnique({ where: { email } });
 
 	if (!user) return;
@@ -202,4 +202,38 @@ export const createPasswordResetToken = async (email: string) => {
 	});
 
 	await emailQueue.add('password-reset', { name: user.name, email: user.email, token: rawToken });
+
+	return rawToken; // controller ignores this — returned so tests can use the token directly
+};
+
+export const resetPassword = async (token: string, newPassword: string) => {
+	const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+	const user = await prisma.passwordResetToken.findUnique({
+		where: { passwordResetToken: tokenHash },
+		include: { user: true },
+	});
+
+	if (!user || user.expiresAt < new Date()) {
+		throw new CustomError(401, 'Invalid or expired reset token.');
+	}
+
+	const newHashedPassword = await bcrypt.hash(newPassword, 10);
+
+	const { accessToken, refreshToken } = JWT.generateTokenPair(user.user);
+
+	await prisma.$transaction([
+		prisma.refreshToken.deleteMany({ where: { userId: user.user.id } }),
+		prisma.passwordResetToken.deleteMany({ where: { passwordResetToken: tokenHash } }),
+		prisma.user.update({ where: { id: user.user.id }, data: { password: newHashedPassword } }),
+		prisma.refreshToken.create({
+			data: {
+				userId: user.user.id,
+				refreshTokenId: refreshToken.refreshTokenId!,
+				expiresAt: refreshToken.expiryDate,
+			},
+		}),
+	]);
+
+	return { accessToken, refreshToken, user: user.user };
 };
