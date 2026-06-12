@@ -178,6 +178,8 @@ export const changePassword = async (
 		}),
 	]);
 
+	await emailQueue.add('password-changed', { name: user.name, email: user.email });
+
 	const { password: _, ...safeUser } = user;
 	return { accessToken, refreshToken, user: { ...safeUser, hasPassword: true } };
 };
@@ -234,6 +236,8 @@ export const resetPassword = async (token: string, newPassword: string) => {
 			},
 		}),
 	]);
+
+	await emailQueue.add('password-changed', { name: user.user.name, email: user.user.email });
 
 	return { accessToken, refreshToken, user: user.user };
 };
