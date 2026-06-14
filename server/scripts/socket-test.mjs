@@ -28,6 +28,12 @@ socket.on('connect_error', (err) => {
 	console.error('Connection error:', err.message);
 });
 
+socket.on('presence:pong', (data) => {
+	console.log('presence:pong received:', data);
+});
+
+socket.emit('presence:ping');
+
 // Disconnect after 3 seconds
 setTimeout(() => {
 	socket.disconnect();
