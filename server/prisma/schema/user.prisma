@@ -9,6 +9,7 @@ model User {
     updatedAt           DateTime             @updatedAt @map("updated_at")
     refreshTokens       RefreshToken[]
     passwordResetTokens PasswordResetToken[]
+    userFiles           UserFile[]
 
     @@map("users")
 }
