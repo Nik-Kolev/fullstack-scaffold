@@ -40,3 +40,16 @@ export const deleteFile = async (userId: number, key: string) => {
 	await deleteR2File(key);
 	await prisma.userFile.delete({ where: { key } });
 };
+
+export const getFilesByFolder = async (userId: number, folderName: string) => {
+	return prisma.userFile.findMany({ where: { userId, folder: folderName } });
+};
+
+export const getUserFolders = async (userId: number) => {
+	const rows = await prisma.userFile.findMany({
+		where: { userId },
+		select: { folder: true },
+		distinct: ['folder'],
+	});
+	return rows.map((r) => r.folder);
+};

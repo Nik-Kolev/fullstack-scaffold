@@ -21,3 +21,16 @@ export const deleteFile = async (req: Request, res: Response) => {
 
 	res.sendStatus(204);
 };
+
+export const getFilesByFolder = async (req: Request, res: Response) => {
+	const folderName = req.params.name as string;
+	const files = await uploadService.getFilesByFolder(req.user!.userId, folderName);
+
+	res.status(200).json({ files });
+};
+
+export const getUserFolders = async (req: Request, res: Response) => {
+	const folders = await uploadService.getUserFolders(req.user!.userId);
+
+	res.status(200).json({ folders });
+};

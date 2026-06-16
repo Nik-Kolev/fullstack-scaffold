@@ -239,3 +239,144 @@ describe('DELETE /api/upload/:key', () => {
 		expect(deleteFile).not.toHaveBeenCalled();
 	});
 });
+
+describe('GET /api/upload/folder/:name', () => {
+	async function uploadToFolder(accessToken: string, folder: string) {
+		await uploadReq(accessToken)
+			.field('folderName', folder)
+			.attach('files', Buffer.from('fake content'), { filename: 'photo.png', contentType: 'image/png' });
+	}
+
+	it('returns files in the requested folder', async () => {
+		const accessToken = await registerAndLogin();
+		await uploadToFolder(accessToken, 'images');
+
+		const res = await request(app)
+			.get('/api/upload/folder/images')
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.files).toHaveLength(1);
+		expect(res.body.files[0]).toMatchObject({ folder: 'images', originalName: 'photo.png' });
+	});
+
+	it('returns an empty array when the folder has no files', async () => {
+		const accessToken = await registerAndLogin();
+
+		const res = await request(app)
+			.get('/api/upload/folder/documents')
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.files).toHaveLength(0);
+	});
+
+	it('returns only files from the requested folder, not other folders', async () => {
+		const accessToken = await registerAndLogin();
+		await uploadToFolder(accessToken, 'images');
+		await uploadToFolder(accessToken, 'documents');
+
+		const res = await request(app)
+			.get('/api/upload/folder/images')
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.files).toHaveLength(1);
+		expect(res.body.files[0].folder).toBe('images');
+	});
+
+	it('does not return files belonging to another user', async () => {
+		const ownerToken = await registerAndLogin();
+		await uploadToFolder(ownerToken, 'images');
+
+		const OTHER_USER = { email: 'other-folder-test@example.com', password: 'Test1234', name: 'Other' };
+		await request(app).post('/api/auth/register').send(OTHER_USER);
+		const otherLogin = await request(app)
+			.post('/api/auth/login')
+			.send({ email: OTHER_USER.email, password: OTHER_USER.password });
+
+		const res = await request(app)
+			.get('/api/upload/folder/images')
+			.set('Authorization', `Bearer ${otherLogin.body.accessToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.files).toHaveLength(0);
+	});
+
+	it('returns 401 with no access token', async () => {
+		const res = await request(app).get('/api/upload/folder/images');
+
+		expect(res.status).toBe(401);
+	});
+});
+
+describe('GET /api/upload/folders', () => {
+	async function uploadToFolder(accessToken: string, folder: string) {
+		await uploadReq(accessToken)
+			.field('folderName', folder)
+			.attach('files', Buffer.from('fake content'), { filename: 'photo.png', contentType: 'image/png' });
+	}
+
+	it('returns all distinct folder names for the user', async () => {
+		const accessToken = await registerAndLogin();
+		await uploadToFolder(accessToken, 'images');
+		await uploadToFolder(accessToken, 'documents');
+
+		const res = await request(app)
+			.get('/api/upload/folders')
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.folders).toHaveLength(2);
+		expect(res.body.folders).toEqual(expect.arrayContaining(['images', 'documents']));
+	});
+
+	it('does not duplicate folder names when multiple files share the same folder', async () => {
+		const accessToken = await registerAndLogin();
+		await uploadToFolder(accessToken, 'images');
+		await uploadToFolder(accessToken, 'images');
+
+		const res = await request(app)
+			.get('/api/upload/folders')
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.folders).toHaveLength(1);
+		expect(res.body.folders[0]).toBe('images');
+	});
+
+	it('returns an empty array when the user has no files', async () => {
+		const accessToken = await registerAndLogin();
+
+		const res = await request(app)
+			.get('/api/upload/folders')
+			.set('Authorization', `Bearer ${accessToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.folders).toHaveLength(0);
+	});
+
+	it('does not return folders belonging to another user', async () => {
+		const ownerToken = await registerAndLogin();
+		await uploadToFolder(ownerToken, 'images');
+
+		const OTHER_USER = { email: 'other-folders-test@example.com', password: 'Test1234', name: 'Other' };
+		await request(app).post('/api/auth/register').send(OTHER_USER);
+		const otherLogin = await request(app)
+			.post('/api/auth/login')
+			.send({ email: OTHER_USER.email, password: OTHER_USER.password });
+
+		const res = await request(app)
+			.get('/api/upload/folders')
+			.set('Authorization', `Bearer ${otherLogin.body.accessToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.folders).toHaveLength(0);
+	});
+
+	it('returns 401 with no access token', async () => {
+		const res = await request(app).get('/api/upload/folders');
+
+		expect(res.status).toBe(401);
+	});
+});

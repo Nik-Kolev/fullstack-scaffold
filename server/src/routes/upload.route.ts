@@ -17,5 +17,7 @@ router.post(
 	uploadController.uploadFiles,
 );
 router.delete('/:key', isAuth, uploadController.deleteFile);
+router.get('/folder/:name', isAuth, uploadController.getFilesByFolder);
+router.get('/folders', isAuth, uploadController.getUserFolders);
 
 export default router;
