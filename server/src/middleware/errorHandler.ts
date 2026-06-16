@@ -2,6 +2,7 @@ import CustomError from '../utils/customError.js';
 import type { Request, Response, NextFunction } from 'express';
 import { Prisma } from '../generated/prisma/index.js';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
 
 const { JsonWebTokenError, TokenExpiredError } = jwt;
 
@@ -11,6 +12,11 @@ const PRISMA_ERROR_MAP: Record<string, { statusCode: number; message: string }> 
 	P2003: { statusCode: 400, message: 'Related record not found.' },
 	P2011: { statusCode: 400, message: 'A required field is missing.' },
 	P2025: { statusCode: 404, message: 'Record not found.' },
+};
+
+const MULTER_ERROR_MAP: Record<string, { statusCode: number; message: string }> = {
+	LIMIT_FILE_SIZE: { statusCode: 400, message: 'File is too large.' },
+	LIMIT_UNEXPECTED_FILE: { statusCode: 400, message: 'Too many files, or unexpected field name.' },
 };
 
 function extractPrismaMeta(meta: unknown): unknown {
@@ -29,6 +35,10 @@ function errorHandler(error: unknown, req: Request, res: Response, _next: NextFu
 		message = error.message;
 		statusCode = error.statusCode;
 		details = error.details;
+	} else if (error instanceof multer.MulterError) {
+		const mapped = MULTER_ERROR_MAP[error.code];
+		statusCode = mapped?.statusCode ?? 400;
+		message = mapped?.message ?? error.message;
 	} else if (error instanceof TokenExpiredError) {
 		message = 'Session expired. Please log in again.';
 		statusCode = 401;

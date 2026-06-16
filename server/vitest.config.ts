@@ -6,5 +6,6 @@ dotenv.config({ path: '.env.test' });
 export default defineConfig({
 	test: {
 		environment: 'node',
+		fileParallelism: false,
 	},
 });

@@ -1,5 +1,3 @@
-import type { string } from 'zod';
-
 declare namespace NodeJS {
 	interface ProcessEnv {
 		PORT: string;

@@ -21,3 +21,10 @@ export const generalLimiter = rateLimit({
 	handler,
 	skip,
 });
+
+export const uploadLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	limit: 30,
+	handler,
+	skip,
+});
