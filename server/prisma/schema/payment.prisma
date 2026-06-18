@@ -1,0 +1,26 @@
+enum PaymentStatus {
+    PENDING
+    SUCCEEDED
+    FAILED
+    REFUNDED
+    PARTIALLY_REFUNDED
+}
+
+model Payment {
+    id                    String        @id @default(cuid())
+    userId                Int           @map("user_id")
+    user                  User          @relation(fields: [userId], references: [id])
+    stripeSessionId       String        @unique @map("stripe_session_id")
+    stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
+    amountTotal           Int           @map("amount_total")
+    quantity              Int           @default(1)
+    currency              String
+    status                PaymentStatus @default(PENDING)
+    description           String?
+    metadata              Json?
+    refundedAt            DateTime?     @map("refunded_at")
+    refundedAmountTotal   Int?          @map("refunded_amount_total")
+    createdAt             DateTime      @default(now()) @map("created_at")
+
+    @@map("payments")
+}

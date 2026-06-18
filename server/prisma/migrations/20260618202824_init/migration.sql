@@ -1,0 +1,96 @@
+-- CreateEnum
+CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'SUCCEEDED', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED');
+
+-- CreateTable
+CREATE TABLE "password_reset_tokens" (
+    "password_reset_token" TEXT NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "password_reset_tokens_pkey" PRIMARY KEY ("password_reset_token")
+);
+
+-- CreateTable
+CREATE TABLE "payments" (
+    "id" TEXT NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "stripe_session_id" TEXT NOT NULL,
+    "stripe_payment_intent_id" TEXT,
+    "amount_total" INTEGER NOT NULL,
+    "quantity" INTEGER NOT NULL DEFAULT 1,
+    "currency" TEXT NOT NULL,
+    "status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
+    "description" TEXT,
+    "metadata" JSONB,
+    "refunded_at" TIMESTAMP(3),
+    "refunded_amount_total" INTEGER,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "payments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "refresh_tokens" (
+    "refresh_token_id" TEXT NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("refresh_token_id")
+);
+
+-- CreateTable
+CREATE TABLE "users" (
+    "id" SERIAL NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT,
+    "name" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'user',
+    "google_id" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "stripe_customer_id" TEXT,
+
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_files" (
+    "key" TEXT NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "url" TEXT NOT NULL,
+    "originalName" TEXT NOT NULL,
+    "mimeType" TEXT NOT NULL,
+    "size" INTEGER NOT NULL,
+    "folder" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_files_pkey" PRIMARY KEY ("key")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payments_stripe_session_id_key" ON "payments"("stripe_session_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payments_stripe_payment_intent_id_key" ON "payments"("stripe_payment_intent_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_google_id_key" ON "users"("google_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_stripe_customer_id_key" ON "users"("stripe_customer_id");
+
+-- AddForeignKey
+ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payments" ADD CONSTRAINT "payments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_files" ADD CONSTRAINT "user_files_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

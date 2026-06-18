@@ -19,5 +19,7 @@ declare namespace NodeJS {
 		R2_BUCKET_NAME: string;
 		R2_ACCOUNT_ID: string;
 		R2_ENDPOINT: string;
+		STRIPE_SECRET_KEY: string;
+		STRIPE_WEBHOOK_SECRET: string;
 	}
 }

@@ -16,6 +16,7 @@ Express + TypeScript REST API with Prisma ORM and PostgreSQL.
 - **Email:** Resend + `react-email` templates
 - **Storage:** Cloudflare R2 (S3-compatible)
 - **Realtime:** Socket.io
+- **Payments:** Stripe (one-time Checkout sessions)
 
 ## Prerequisites
 
@@ -55,6 +56,8 @@ npm run dev
 | `R2_BUCKET_NAME`       | R2 bucket name                                  |
 | `R2_PUBLIC_URL`        | Public base URL for the bucket (e.g. `https://pub-xxx.r2.dev`) |
 | `R2_ENDPOINT`          | R2 S3 API endpoint (EU: `https://<accountid>.eu.r2.cloudflarestorage.com`) |
+| `STRIPE_SECRET_KEY`    | Stripe secret key — Developers → API keys in Stripe Dashboard              |
+| `STRIPE_WEBHOOK_SECRET`| Stripe webhook signing secret — Developers → Webhooks in Stripe Dashboard  |
 
 `DATABASE_URL` format: `postgresql://USER:PASSWORD@localhost:5432/DBNAME`
 
@@ -74,7 +77,7 @@ src/
   middleware/       errorHandler, validateBody, isAuthenticated, requireRole, rateLimiter, redisCache, upload
   schemas/          Zod schemas — one file per domain
   types/            TypeScript augmentations (env.d.ts, express.d.ts)
-  lib/              Third-party singletons — prisma.ts, jwt.ts, redis.ts, bullmq.ts, googleOAuth.ts, resend.ts, r2.ts
+  lib/              Third-party singletons — prisma.ts, jwt.ts, redis.ts, bullmq.ts, googleOAuth.ts, resend.ts, r2.ts, stripe.ts
   lib/socket/       Socket.io setup — socket.ts (initSocket + io singleton), room.ts (room rules), handlers.ts (handler registry), events/ (feature handlers)
   emails/           react-email templates (welcome, passwordReset, passwordChanged), rendered by workers
   workers/          BullMQ worker definitions — email.worker.ts, tokenCleanup.worker.ts; index.ts barrel-exports all
@@ -86,6 +89,7 @@ prisma/
     base.prisma     Generator config
     user.prisma     User model
     refreshToken.prisma  RefreshToken model
+    payment.prisma       PaymentStatus enum + Payment model
   migrations/       Auto-generated SQL migration history — commit these
   seed.ts           Seed script — upserts dev/test users
 ```
@@ -108,6 +112,7 @@ prisma/
 | `DELETE /upload/:key`           | required | Delete a file (`key` must be URL-encoded)       |
 | `GET /upload/folder/:name`      | required | List all files in a named folder                |
 | `GET /upload/folders`           | required | List all distinct folder names for the user     |
+| `POST /payment/checkout`        | required | Create Stripe Checkout session, returns `{ url }` for redirect |
 
 ## Realtime (Socket.io)
 

@@ -28,3 +28,11 @@ export const uploadLimiter = rateLimit({
 	handler,
 	skip,
 });
+
+export const checkoutLimiter = rateLimit({
+	windowMs: 5 * 1000,
+	limit: 1,
+	keyGenerator: (req) => String(req.user!.userId),
+	handler,
+	skip,
+});
