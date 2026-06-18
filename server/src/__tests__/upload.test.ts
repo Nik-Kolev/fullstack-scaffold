@@ -67,8 +67,14 @@ describe('POST /api/upload', () => {
 
 		const res = await uploadReq(accessToken)
 			.field('folderName', 'documents')
-			.attach('files', Buffer.from('file one'), { filename: 'a.png', contentType: 'image/png' })
-			.attach('files', Buffer.from('file two'), { filename: 'b.png', contentType: 'image/png' });
+			.attach('files', Buffer.from('file one'), {
+				filename: 'a.png',
+				contentType: 'image/png',
+			})
+			.attach('files', Buffer.from('file two'), {
+				filename: 'b.png',
+				contentType: 'image/png',
+			});
 
 		expect(res.status).toBe(200);
 		expect(res.body.fileData).toHaveLength(2);
@@ -217,7 +223,11 @@ describe('DELETE /api/upload/:key', () => {
 		const ownerToken = await registerAndLogin();
 		const key = await uploadOneFile(ownerToken);
 
-		const OTHER_USER = { email: 'other-upload-test@example.com', password: 'Test1234', name: 'Other' };
+		const OTHER_USER = {
+			email: 'other-upload-test@example.com',
+			password: 'Test1234',
+			name: 'Other',
+		};
 		await request(app).post('/api/auth/register').send(OTHER_USER);
 		const otherLogin = await request(app)
 			.post('/api/auth/login')
@@ -233,7 +243,9 @@ describe('DELETE /api/upload/:key', () => {
 	});
 
 	it('returns 401 with no access token', async () => {
-		const res = await request(app).delete(`/api/upload/${encodeURIComponent('1/images/x.png')}`);
+		const res = await request(app).delete(
+			`/api/upload/${encodeURIComponent('1/images/x.png')}`,
+		);
 
 		expect(res.status).toBe(401);
 		expect(deleteFile).not.toHaveBeenCalled();
@@ -244,7 +256,10 @@ describe('GET /api/upload/folder/:name', () => {
 	async function uploadToFolder(accessToken: string, folder: string) {
 		await uploadReq(accessToken)
 			.field('folderName', folder)
-			.attach('files', Buffer.from('fake content'), { filename: 'photo.png', contentType: 'image/png' });
+			.attach('files', Buffer.from('fake content'), {
+				filename: 'photo.png',
+				contentType: 'image/png',
+			});
 	}
 
 	it('returns files in the requested folder', async () => {
@@ -289,7 +304,11 @@ describe('GET /api/upload/folder/:name', () => {
 		const ownerToken = await registerAndLogin();
 		await uploadToFolder(ownerToken, 'images');
 
-		const OTHER_USER = { email: 'other-folder-test@example.com', password: 'Test1234', name: 'Other' };
+		const OTHER_USER = {
+			email: 'other-folder-test@example.com',
+			password: 'Test1234',
+			name: 'Other',
+		};
 		await request(app).post('/api/auth/register').send(OTHER_USER);
 		const otherLogin = await request(app)
 			.post('/api/auth/login')
@@ -314,7 +333,10 @@ describe('GET /api/upload/folders', () => {
 	async function uploadToFolder(accessToken: string, folder: string) {
 		await uploadReq(accessToken)
 			.field('folderName', folder)
-			.attach('files', Buffer.from('fake content'), { filename: 'photo.png', contentType: 'image/png' });
+			.attach('files', Buffer.from('fake content'), {
+				filename: 'photo.png',
+				contentType: 'image/png',
+			});
 	}
 
 	it('returns all distinct folder names for the user', async () => {
@@ -360,7 +382,11 @@ describe('GET /api/upload/folders', () => {
 		const ownerToken = await registerAndLogin();
 		await uploadToFolder(ownerToken, 'images');
 
-		const OTHER_USER = { email: 'other-folders-test@example.com', password: 'Test1234', name: 'Other' };
+		const OTHER_USER = {
+			email: 'other-folders-test@example.com',
+			password: 'Test1234',
+			name: 'Other',
+		};
 		await request(app).post('/api/auth/register').send(OTHER_USER);
 		const otherLogin = await request(app)
 			.post('/api/auth/login')

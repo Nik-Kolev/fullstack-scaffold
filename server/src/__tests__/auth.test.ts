@@ -289,7 +289,9 @@ describe('POST /api/auth/change-password', () => {
 
 	it('returns 200 with user, accessToken, and message', async () => {
 		await register();
-		const { body: { accessToken } } = await login();
+		const {
+			body: { accessToken },
+		} = await login();
 
 		const res = await changePasswordReq(accessToken, {
 			currentPassword: TEST_USER.password,
@@ -305,7 +307,9 @@ describe('POST /api/auth/change-password', () => {
 
 	it('sets a new refreshToken cookie', async () => {
 		await register();
-		const { body: { accessToken } } = await login();
+		const {
+			body: { accessToken },
+		} = await login();
 
 		const res = await changePasswordReq(accessToken, {
 			currentPassword: TEST_USER.password,
@@ -319,7 +323,9 @@ describe('POST /api/auth/change-password', () => {
 
 	it('new refresh cookie can be used to refresh', async () => {
 		await register();
-		const { body: { accessToken } } = await login();
+		const {
+			body: { accessToken },
+		} = await login();
 
 		const changeRes = await changePasswordReq(accessToken, {
 			currentPassword: TEST_USER.password,
@@ -350,7 +356,9 @@ describe('POST /api/auth/change-password', () => {
 
 	it('blacklists old access token after password change', async () => {
 		await register();
-		const { body: { accessToken } } = await login();
+		const {
+			body: { accessToken },
+		} = await login();
 
 		await changePasswordReq(accessToken, {
 			currentPassword: TEST_USER.password,
@@ -378,7 +386,9 @@ describe('POST /api/auth/change-password', () => {
 
 	it('returns 401 for wrong currentPassword', async () => {
 		await register();
-		const { body: { accessToken } } = await login();
+		const {
+			body: { accessToken },
+		} = await login();
 
 		const res = await changePasswordReq(accessToken, {
 			currentPassword: 'WrongPass1',
@@ -390,7 +400,9 @@ describe('POST /api/auth/change-password', () => {
 
 	it('returns 400 when currentPassword is missing but user has one', async () => {
 		await register();
-		const { body: { accessToken } } = await login();
+		const {
+			body: { accessToken },
+		} = await login();
 
 		const res = await changePasswordReq(accessToken, { newPassword: 'NewPass5678' });
 
@@ -399,7 +411,9 @@ describe('POST /api/auth/change-password', () => {
 
 	it('returns 400 when newPassword is the same as currentPassword', async () => {
 		await register();
-		const { body: { accessToken } } = await login();
+		const {
+			body: { accessToken },
+		} = await login();
 
 		const res = await changePasswordReq(accessToken, {
 			currentPassword: TEST_USER.password,
@@ -411,7 +425,9 @@ describe('POST /api/auth/change-password', () => {
 
 	it('returns 400 for a weak newPassword', async () => {
 		await register();
-		const { body: { accessToken } } = await login();
+		const {
+			body: { accessToken },
+		} = await login();
 
 		const res = await changePasswordReq(accessToken, {
 			currentPassword: TEST_USER.password,
@@ -484,7 +500,7 @@ describe('POST /api/auth/reset-password', () => {
 		const loginRes = await login();
 		const oldCookie = getCookies(loginRes).join('; ');
 
-		const token = await authService.forgotPassword(TEST_USER.email) as string;
+		const token = (await authService.forgotPassword(TEST_USER.email)) as string;
 		await resetPassword(token, 'NewPass5678');
 
 		const res = await request(app).post('/api/auth/refresh').set('Cookie', oldCookie);

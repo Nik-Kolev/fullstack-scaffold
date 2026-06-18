@@ -16,7 +16,10 @@ const PRISMA_ERROR_MAP: Record<string, { statusCode: number; message: string }> 
 
 const MULTER_ERROR_MAP: Record<string, { statusCode: number; message: string }> = {
 	LIMIT_FILE_SIZE: { statusCode: 400, message: 'File is too large.' },
-	LIMIT_UNEXPECTED_FILE: { statusCode: 400, message: 'Too many files, or unexpected field name.' },
+	LIMIT_UNEXPECTED_FILE: {
+		statusCode: 400,
+		message: 'Too many files, or unexpected field name.',
+	},
 };
 
 function extractPrismaMeta(meta: unknown): unknown {

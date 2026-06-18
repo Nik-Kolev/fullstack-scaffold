@@ -23,7 +23,10 @@ describe('email worker', () => {
 	});
 
 	it('handles a welcome job', async () => {
-		await handleEmailJob({ name: 'welcome', data: { name: 'Test', email: 'test@example.com' } } as Job);
+		await handleEmailJob({
+			name: 'welcome',
+			data: { name: 'Test', email: 'test@example.com' },
+		} as Job);
 
 		expect(vi.mocked(sendEmail)).toHaveBeenCalledWith(
 			expect.objectContaining({ to: 'test@example.com', subject: 'Welcome' }),
