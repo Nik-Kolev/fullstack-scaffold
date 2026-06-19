@@ -86,3 +86,42 @@ export const createCheckoutSession = async (
 
 	return { url: session.url };
 };
+
+export const updatePaymentBySessionId = async (
+	sessionId: string,
+	data: {
+		status: 'SUCCEEDED' | 'FAILED';
+		stripePaymentIntentId?: string;
+	},
+) => {
+	const payment = await prisma.payment.findUnique({
+		where: { stripeSessionId: sessionId },
+	});
+
+	if (!payment) throw new CustomError(404, 'Payment not found.');
+
+	return prisma.payment.update({
+		where: { id: payment.id },
+		data,
+	});
+};
+
+export const updatePaymentByPaymentIntentId = async (
+	paymentIntentId: string,
+	data: {
+		status: 'REFUNDED' | 'PARTIALLY_REFUNDED';
+		refundedAt: Date;
+		refundedAmountTotal: number;
+	},
+) => {
+	const payment = await prisma.payment.findUnique({
+		where: { stripePaymentIntentId: paymentIntentId },
+	});
+
+	if (!payment) throw new CustomError(404, 'Payment not found.');
+
+	return prisma.payment.update({
+		where: { id: payment.id },
+		data,
+	});
+};

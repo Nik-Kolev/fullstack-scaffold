@@ -113,6 +113,7 @@ prisma/
 | `GET /upload/folder/:name`      | required | List all files in a named folder                |
 | `GET /upload/folders`           | required | List all distinct folder names for the user     |
 | `POST /payment/checkout`        | required | Create Stripe Checkout session, returns `{ url }` for redirect |
+| `POST /payment/webhook`         | —        | Stripe webhook — updates payment status on `checkout.session.completed/expired` and `charge.refunded` |
 
 ## Realtime (Socket.io)
 
