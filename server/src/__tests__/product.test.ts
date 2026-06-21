@@ -72,10 +72,14 @@ afterAll(async () => {
 // ─── GET /api/product ────────────────────────────────────────────────────────
 
 describe('GET /api/product', () => {
-	it('returns empty array when no products exist', async () => {
+	it('returns empty result with pagination metadata when no products exist', async () => {
 		const res = await request(app).get('/api/product');
 		expect(res.status).toBe(200);
 		expect(res.body.products).toEqual([]);
+		expect(res.body.total).toBe(0);
+		expect(res.body.page).toBe(1);
+		expect(res.body.limit).toBe(10);
+		expect(res.body.totalPages).toBe(0);
 	});
 
 	it('returns only active products', async () => {
@@ -86,12 +90,37 @@ describe('GET /api/product', () => {
 		const res = await request(app).get('/api/product');
 		expect(res.status).toBe(200);
 		expect(res.body.products).toHaveLength(2);
+		expect(res.body.total).toBe(2);
 		expect(res.body.products.map((p: { name: string }) => p.name)).not.toContain('Inactive');
 	});
 
 	it('does not require authentication', async () => {
 		const res = await request(app).get('/api/product');
 		expect(res.status).toBe(200);
+	});
+
+	it('respects page and limit query params', async () => {
+		await seedProduct({ name: 'P1' });
+		await seedProduct({ name: 'P2' });
+		await seedProduct({ name: 'P3' });
+
+		const res = await request(app).get('/api/product?page=2&limit=2');
+		expect(res.status).toBe(200);
+		expect(res.body.products).toHaveLength(1);
+		expect(res.body.page).toBe(2);
+		expect(res.body.limit).toBe(2);
+		expect(res.body.total).toBe(3);
+		expect(res.body.totalPages).toBe(2);
+	});
+
+	it('returns 400 for invalid query params', async () => {
+		const res = await request(app).get('/api/product?page=0');
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 when limit exceeds 100', async () => {
+		const res = await request(app).get('/api/product?limit=101');
+		expect(res.status).toBe(400);
 	});
 });
 

@@ -7,9 +7,11 @@ export const createProduct = async (req: Request, res: Response) => {
 	res.status(201).json({ product });
 };
 
-export const getProducts = async (_req: Request, res: Response) => {
-	const products = await productService.getProducts();
-	res.status(200).json({ products });
+export const getProducts = async (req: Request, res: Response) => {
+	const page = Number(req.query.page ?? 1);
+	const limit = Number(req.query.limit ?? 10);
+	const result = await productService.getProducts(page, limit);
+	res.status(200).json(result);
 };
 
 export const getProductById = async (req: Request, res: Response) => {

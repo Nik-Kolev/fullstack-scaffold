@@ -22,11 +22,19 @@ export const createProduct = async (
 	}
 };
 
-export const getProducts = async () => {
-	return prisma.product.findMany({
-		where: { isActive: true },
-		orderBy: { createdAt: 'desc' },
-	});
+export const getProducts = async (page: number, limit: number) => {
+	const skip = (page - 1) * limit;
+	const [products, total] = await prisma.$transaction([
+		prisma.product.findMany({
+			where: { isActive: true },
+			orderBy: { createdAt: 'desc' },
+			skip,
+			take: limit,
+		}),
+		prisma.product.count({ where: { isActive: true } }),
+	]);
+
+	return { products, total, page, limit, totalPages: Math.ceil(total / limit) };
 };
 
 export const getProductById = async (id: number) => {

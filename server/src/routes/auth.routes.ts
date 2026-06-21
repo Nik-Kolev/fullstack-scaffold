@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as authController from '../controllers/authController.js';
-import validateBody from '../middleware/validateBody.js';
+import { validateBody } from '../middleware/validateRequest.js';
 import * as authSchemas from '../schemas/auth.schema.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { isAuth } from '../middleware/isAuthenticated.js';

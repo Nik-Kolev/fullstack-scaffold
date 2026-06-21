@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as uploadController from '../controllers/uploadController.js';
-import validateBody from '../middleware/validateBody.js';
+import { validateBody } from '../middleware/validateRequest.js';
 import * as uploadSchemas from '../schemas/upload.schema.js';
 import { uploadLimiter } from '../middleware/rateLimiter.js';
 import { isAuth } from '../middleware/isAuthenticated.js';

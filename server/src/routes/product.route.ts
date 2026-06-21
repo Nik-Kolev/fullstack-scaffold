@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as productController from '../controllers/productController.js';
-import validateBody from '../middleware/validateBody.js';
+import { validateBody, validateQuery } from '../middleware/validateRequest.js';
 import * as productSchemas from '../schemas/product.schema.js';
 import { isAuth } from '../middleware/isAuthenticated.js';
 import { requireRole } from '../middleware/requireRole.js';
@@ -8,7 +8,7 @@ import { uploadImage } from '../middleware/upload.js';
 
 const router = Router();
 
-router.get('/', productController.getProducts);
+router.get('/', validateQuery(productSchemas.productQuerySchema), productController.getProducts);
 router.get('/:id', productController.getProductById);
 router.post(
 	'/',
