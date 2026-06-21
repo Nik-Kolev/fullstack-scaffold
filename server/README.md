@@ -216,6 +216,17 @@ Tests clear relevant tables and Redis state in `beforeEach` — no manual cleanu
 
 > After that initial setup, `npm run db:migrate` and `npm run db:fresh` both keep the test DB in sync automatically.
 
+### Required `.env.test` values
+
+`.env.test` is gitignored — copy `.env` and adjust. In addition to the standard vars, the following are required for the full test suite to pass:
+
+| Variable | Test value | Why |
+|---|---|---|
+| `STRIPE_SECRET_KEY` | `sk_test_dummy` | `stripe.ts` initialises at module load — all test files that import `app` need this set, even those that don't test payments |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_dummy` | Same reason — referenced in `paymentController.ts` |
+
+Payment tests mock the Stripe SDK entirely — no real API calls are made. The values above just prevent the Stripe constructor from throwing on startup.
+
 ## Adding a New Model
 
 1. Create `prisma/schema/<domain>.prisma`

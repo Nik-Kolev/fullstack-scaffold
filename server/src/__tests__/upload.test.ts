@@ -17,6 +17,7 @@ vi.mock('../lib/r2.js', () => ({
 const TEST_USER = { email: 'upload-test@example.com', password: 'Test1234', name: 'Uploader' };
 
 beforeEach(async () => {
+	await prisma.payment.deleteMany();
 	await prisma.userFile.deleteMany();
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();
