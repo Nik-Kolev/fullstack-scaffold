@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import app from '../app.js';
 import prisma from '../lib/prisma.js';
 import redis from '../lib/redis.js';
+import { uploadFile, deleteFile } from '../lib/r2.js';
 
 vi.mock('../lib/bullmq.js', () => ({ emailQueue: { add: vi.fn() } }));
 
@@ -13,6 +14,15 @@ vi.mock('../lib/stripe.js', () => ({
 		webhooks: { constructEvent: vi.fn() },
 	},
 }));
+
+vi.mock('../lib/r2.js', () => ({
+	uploadFile: vi.fn(),
+	deleteFile: vi.fn(),
+	default: {},
+}));
+
+const mockUploadFile = vi.mocked(uploadFile);
+const mockDeleteFile = vi.mocked(deleteFile);
 
 const USER = { email: 'product-user@example.com', password: 'Test1234', name: 'User' };
 const ADMIN = { email: 'product-admin@example.com', password: 'Test1234', name: 'Admin' };
@@ -287,7 +297,7 @@ describe('DELETE /api/product/:id', () => {
 		expect(res.status).toBe(404);
 	});
 
-	it('returns 204 and sets isActive to false', async () => {
+	it('returns 204, sets isActive to false, and nulls imageUrl', async () => {
 		const token = await registerAndLoginAsAdmin();
 		const product = await seedProduct();
 		const res = await request(app)
@@ -298,6 +308,23 @@ describe('DELETE /api/product/:id', () => {
 
 		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
 		expect(inDb?.isActive).toBe(false);
+		expect(inDb?.imageUrl).toBeNull();
+	});
+
+	it('deletes R2 image when deactivating a product that has one', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/img.jpg',
+		});
+
+		await request(app)
+			.delete(`/api/product/${product.id}`)
+			.set('Authorization', `Bearer ${token}`);
+
+		expect(mockDeleteFile).toHaveBeenCalledOnce();
+
+		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
+		expect(inDb?.imageUrl).toBeNull();
 	});
 
 	it('deactivated product no longer appears in GET /api/product', async () => {
@@ -310,5 +337,108 @@ describe('DELETE /api/product/:id', () => {
 
 		const res = await request(app).get('/api/product');
 		expect(res.body.products).toHaveLength(0);
+	});
+});
+
+// ─── POST /api/product/:id/image ─────────────────────────────────────────────
+
+describe('POST /api/product/:id/image', () => {
+	it('returns 401 with no Authorization header', async () => {
+		const product = await seedProduct();
+		const res = await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.attach('image', Buffer.from('fake'), {
+				filename: 'test.jpg',
+				contentType: 'image/jpeg',
+			});
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 403 for non-admin user', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+		const res = await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', Buffer.from('fake'), {
+				filename: 'test.jpg',
+				contentType: 'image/jpeg',
+			});
+		expect(res.status).toBe(403);
+	});
+
+	it('returns 404 for non-existent product', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const res = await request(app)
+			.post('/api/product/99999/image')
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', Buffer.from('fake'), {
+				filename: 'test.jpg',
+				contentType: 'image/jpeg',
+			});
+		expect(res.status).toBe(404);
+	});
+
+	it('returns 400 when no file is attached', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct();
+		const res = await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`);
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 for non-image file type (e.g. PDF)', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct();
+		const res = await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', Buffer.from('%PDF'), {
+				filename: 'doc.pdf',
+				contentType: 'application/pdf',
+			});
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 200 and sets imageUrl on the product', async () => {
+		mockUploadFile.mockResolvedValueOnce('https://r2.example.com/products/1/uuid.jpg');
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct();
+
+		const res = await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', Buffer.from('fake'), {
+				filename: 'test.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		expect(res.status).toBe(200);
+		expect(res.body.product.imageUrl).toBe('https://r2.example.com/products/1/uuid.jpg');
+
+		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
+		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/uuid.jpg');
+	});
+
+	it('deletes old R2 image before uploading the replacement', async () => {
+		mockUploadFile.mockResolvedValueOnce('https://r2.example.com/products/1/new.jpg');
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/old.jpg',
+		});
+
+		await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', Buffer.from('fake'), {
+				filename: 'new.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		expect(mockDeleteFile).toHaveBeenCalledOnce();
+
+		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
+		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/new.jpg');
 	});
 });
