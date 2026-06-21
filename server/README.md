@@ -75,7 +75,7 @@ src/
   controllers/      Thin handlers — call service, set cookie, send response
   services/         All DB and business logic
   middleware/       errorHandler, validateBody, isAuthenticated, requireRole, rateLimiter, redisCache, upload
-  schemas/          Zod schemas — one file per domain
+  schemas/          Zod schemas — one file per domain (auth, upload, payment, product, user)
   types/            TypeScript augmentations (env.d.ts, express.d.ts)
   lib/              Third-party singletons — prisma.ts, jwt.ts, redis.ts, bullmq.ts, googleOAuth.ts, resend.ts, r2.ts, stripe.ts
   lib/socket/       Socket.io setup — socket.ts (initSocket + io singleton), room.ts (room rules), handlers.ts (handler registry), events/ (feature handlers)
@@ -108,6 +108,8 @@ prisma/
 | `POST /auth/change-password`    | required | Change password; invalidates other sessions    |
 | `POST /auth/forgot-password`    | —        | Always 200; emails a reset link if user exists |
 | `POST /auth/reset-password`     | —        | Reset password via emailed token               |
+| `GET /user/me`                  | required | Fetch the authenticated user's profile          |
+| `PATCH /user/me`                | required | Update own name or email                        |
 | `GET /user/:id`                 | —        | Fetch a user by ID                              |
 | `POST /upload`                  | required | Upload up to 10 files to a folder               |
 | `DELETE /upload/:key`           | required | Delete a file (`key` must be URL-encoded)       |
@@ -115,11 +117,13 @@ prisma/
 | `GET /upload/folders`           | required | List all distinct folder names for the user     |
 | `POST /payment/checkout`        | required | Create Stripe Checkout session; body `{ productId, quantity }`, returns `{ url }` |
 | `POST /payment/webhook`         | —        | Stripe webhook — updates payment status on `checkout.session.completed/expired` and `charge.refunded` |
-| `GET /product`                  | —        | List all active products                                        |
+| `GET /product`                  | —        | List active products; supports `?page=&limit=` (defaults 1/10) |
 | `GET /product/:id`              | —        | Get a single product by ID (includes inactive)                  |
-| `POST /product`                 | admin    | Create a product; body `{ name, price, description?, imageUrl? }` |
+| `POST /product`                 | admin    | Create a product; multipart `{ name, price, description? }` + optional `image` file |
 | `PUT /product/:id`              | admin    | Update a product (partial — at least one field required)        |
-| `DELETE /product/:id`           | admin    | Soft-delete a product (`isActive = false`)                      |
+| `DELETE /product/:id`           | admin    | Soft-delete a product (`isActive = false`), deletes R2 image    |
+| `POST /product/:id/image`       | admin    | Replace product image; deletes old R2 object first              |
+| `DELETE /product/:id/image`     | admin    | Remove product image without deactivating                       |
 
 ## Realtime (Socket.io)
 
