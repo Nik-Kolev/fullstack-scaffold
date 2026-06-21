@@ -3,7 +3,7 @@ import * as productService from '../services/productService.js';
 import CustomError from '../utils/customError.js';
 
 export const createProduct = async (req: Request, res: Response) => {
-	const product = await productService.createProduct(req.body);
+	const product = await productService.createProduct(req.body, req.file);
 	res.status(201).json({ product });
 };
 
@@ -24,6 +24,11 @@ export const updateProduct = async (req: Request, res: Response) => {
 
 export const deactivateProduct = async (req: Request, res: Response) => {
 	await productService.deactivateProduct(Number(req.params.id));
+	res.status(204).send();
+};
+
+export const deleteProductImage = async (req: Request, res: Response) => {
+	await productService.deleteProductImage(Number(req.params.id));
 	res.status(204).send();
 };
 

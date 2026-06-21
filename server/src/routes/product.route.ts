@@ -14,6 +14,7 @@ router.post(
 	'/',
 	isAuth,
 	requireRole('admin'),
+	uploadImage.single('image'),
 	validateBody(productSchemas.createProductSchema),
 	productController.createProduct,
 );
@@ -25,6 +26,7 @@ router.put(
 	productController.updateProduct,
 );
 router.delete('/:id', isAuth, requireRole('admin'), productController.deactivateProduct);
+router.delete('/:id/image', isAuth, requireRole('admin'), productController.deleteProductImage);
 router.post(
 	'/:id/image',
 	isAuth,

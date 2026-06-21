@@ -214,6 +214,42 @@ describe('POST /api/product', () => {
 			imageUrl: 'https://example.com/widget.png',
 		});
 	});
+
+	it('returns 201 with imageUrl when image file is attached', async () => {
+		mockUploadFile.mockResolvedValueOnce('https://r2.example.com/products/1/uuid.jpg');
+		const token = await registerAndLoginAsAdmin();
+		const res = await request(app)
+			.post('/api/product')
+			.set('Authorization', `Bearer ${token}`)
+			.field('name', 'Widget')
+			.field('price', '999')
+			.attach('image', Buffer.from('fake'), {
+				filename: 'img.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		expect(res.status).toBe(201);
+		expect(res.body.product.imageUrl).toBe('https://r2.example.com/products/1/uuid.jpg');
+		expect(mockUploadFile).toHaveBeenCalledOnce();
+	});
+
+	it('rolls back product creation if image upload fails', async () => {
+		mockUploadFile.mockRejectedValueOnce(new Error('R2 unavailable'));
+		const token = await registerAndLoginAsAdmin();
+		const res = await request(app)
+			.post('/api/product')
+			.set('Authorization', `Bearer ${token}`)
+			.field('name', 'Widget')
+			.field('price', '999')
+			.attach('image', Buffer.from('fake'), {
+				filename: 'img.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		expect(res.status).toBe(500);
+		const count = await prisma.product.count();
+		expect(count).toBe(0);
+	});
 });
 
 // ─── PUT /api/product/:id ────────────────────────────────────────────────────
@@ -440,5 +476,63 @@ describe('POST /api/product/:id/image', () => {
 
 		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
 		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/new.jpg');
+	});
+});
+
+// ─── DELETE /api/product/:id/image ───────────────────────────────────────────
+
+describe('DELETE /api/product/:id/image', () => {
+	it('returns 401 with no Authorization header', async () => {
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/img.jpg',
+		});
+		const res = await request(app).delete(`/api/product/${product.id}/image`);
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 403 for non-admin user', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/img.jpg',
+		});
+		const res = await request(app)
+			.delete(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`);
+		expect(res.status).toBe(403);
+	});
+
+	it('returns 404 for non-existent product', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const res = await request(app)
+			.delete('/api/product/99999/image')
+			.set('Authorization', `Bearer ${token}`);
+		expect(res.status).toBe(404);
+	});
+
+	it('returns 404 when product has no image', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct();
+		const res = await request(app)
+			.delete(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`);
+		expect(res.status).toBe(404);
+	});
+
+	it('returns 204, deletes from R2, nulls imageUrl, and leaves product active', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/img.jpg',
+		});
+
+		const res = await request(app)
+			.delete(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`);
+
+		expect(res.status).toBe(204);
+		expect(mockDeleteFile).toHaveBeenCalledOnce();
+
+		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
+		expect(inDb?.imageUrl).toBeNull();
+		expect(inDb?.isActive).toBe(true);
 	});
 });
