@@ -36,6 +36,16 @@ async function seedData() {
 			name: 'Nik',
 		},
 	});
+	const productCount = await prisma.product.count();
+	if (productCount === 0) {
+		await prisma.product.createMany({
+			data: [
+				{ name: 'Basic Plan', price: 999, description: 'Great for getting started' },
+				{ name: 'Pro Plan', price: 2999, description: 'Perfect for growing teams' },
+			],
+		});
+	}
+
 	console.log(user, admin, nik);
 }
 

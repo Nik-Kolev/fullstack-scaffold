@@ -22,7 +22,7 @@ vi.mock('../lib/stripe.js', () => ({
 }));
 
 const TEST_USER = { email: 'pay-test@example.com', password: 'Test1234', name: 'Payer' };
-const VALID_BODY = { amountTotal: 1000, quantity: 1, description: 'Test product' };
+let PRODUCT_ID = 0;
 const SESSION_ID = 'cs_test_abc123';
 const SESSION_URL = 'https://checkout.stripe.com/pay/cs_test_abc123';
 const CUSTOMER_ID = 'cus_test_123';
@@ -36,11 +36,11 @@ async function registerAndLogin(): Promise<{ accessToken: string; userId: number
 	return { accessToken: loginRes.body.accessToken, userId: regRes.body.user.id };
 }
 
-function checkoutReq(token: string, body: object = VALID_BODY) {
+function checkoutReq(token: string, body?: object) {
 	return request(app)
 		.post('/api/payment/checkout')
 		.set('Authorization', `Bearer ${token}`)
-		.send(body);
+		.send(body ?? { productId: PRODUCT_ID, quantity: 1 });
 }
 
 async function sendWebhook(event: Record<string, unknown>) {
@@ -73,6 +73,7 @@ async function seedPayment(userId: number, overrides: object = {}) {
 
 beforeEach(async () => {
 	await prisma.payment.deleteMany();
+	await prisma.product.deleteMany();
 	await prisma.userFile.deleteMany();
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();
@@ -83,6 +84,8 @@ beforeEach(async () => {
 		id: SESSION_ID,
 		url: SESSION_URL,
 	} as any);
+	const product = await prisma.product.create({ data: { name: 'Test Product', price: 1000 } });
+	PRODUCT_ID = product.id;
 });
 
 afterAll(async () => {
@@ -95,13 +98,15 @@ afterAll(async () => {
 describe('POST /api/payment/checkout', () => {
 	describe('auth guard', () => {
 		it('returns 401 with no Authorization header', async () => {
-			const res = await request(app).post('/api/payment/checkout').send(VALID_BODY);
+			const res = await request(app)
+				.post('/api/payment/checkout')
+				.send({ productId: 1, quantity: 1 });
 			expect(res.status).toBe(401);
 		});
 	});
 
 	describe('validation', () => {
-		it('returns 400 when amountTotal is missing', async () => {
+		it('returns 400 when productId is missing', async () => {
 			const { accessToken } = await registerAndLogin();
 			const res = await checkoutReq(accessToken, { quantity: 1 });
 			expect(res.status).toBe(400);
@@ -109,52 +114,60 @@ describe('POST /api/payment/checkout', () => {
 
 		it('returns 400 when quantity is missing', async () => {
 			const { accessToken } = await registerAndLogin();
-			const res = await checkoutReq(accessToken, { amountTotal: 1000 });
+			const res = await checkoutReq(accessToken, { productId: PRODUCT_ID });
 			expect(res.status).toBe(400);
 		});
 
-		it('returns 400 when amountTotal is a float — should be cents (integer)', async () => {
+		it('returns 400 when productId is a float', async () => {
 			const { accessToken } = await registerAndLogin();
-			const res = await checkoutReq(accessToken, { amountTotal: 9.99, quantity: 1 });
+			const res = await checkoutReq(accessToken, { productId: 1.5, quantity: 1 });
 			expect(res.status).toBe(400);
 		});
 
-		it('returns 400 when amountTotal is zero', async () => {
+		it('returns 400 when productId is zero', async () => {
 			const { accessToken } = await registerAndLogin();
-			const res = await checkoutReq(accessToken, { amountTotal: 0, quantity: 1 });
+			const res = await checkoutReq(accessToken, { productId: 0, quantity: 1 });
 			expect(res.status).toBe(400);
 		});
 
-		it('returns 400 when amountTotal is negative', async () => {
+		it('returns 400 when productId is negative', async () => {
 			const { accessToken } = await registerAndLogin();
-			const res = await checkoutReq(accessToken, { amountTotal: -500, quantity: 1 });
+			const res = await checkoutReq(accessToken, { productId: -1, quantity: 1 });
 			expect(res.status).toBe(400);
 		});
 
-		it('returns 400 when amountTotal is a numeric string', async () => {
+		it('returns 400 when productId is a numeric string', async () => {
 			const { accessToken } = await registerAndLogin();
-			const res = await checkoutReq(accessToken, { amountTotal: '1000', quantity: 1 });
-			expect(res.status).toBe(400);
-		});
-
-		it('returns 400 when description is an empty string', async () => {
-			const { accessToken } = await registerAndLogin();
-			const res = await checkoutReq(accessToken, { ...VALID_BODY, description: '' });
-			expect(res.status).toBe(400);
-		});
-
-		it('returns 400 when description is null — optional means undefined, not nullable', async () => {
-			const { accessToken } = await registerAndLogin();
-			const res = await checkoutReq(accessToken, { ...VALID_BODY, description: null });
+			const res = await checkoutReq(accessToken, { productId: '1', quantity: 1 });
 			expect(res.status).toBe(400);
 		});
 
 		it('strips unknown fields and does not forward them to Stripe', async () => {
 			const { accessToken } = await registerAndLogin();
-			await checkoutReq(accessToken, { ...VALID_BODY, injectedField: 'DROP TABLE users' });
-
+			await checkoutReq(accessToken, {
+				productId: PRODUCT_ID,
+				quantity: 1,
+				injectedField: 'DROP TABLE users',
+			});
 			const callArg = vi.mocked(stripe.checkout.sessions.create).mock.calls[0]?.[0];
 			expect(JSON.stringify(callArg)).not.toContain('injectedField');
+		});
+	});
+
+	describe('product lookup', () => {
+		it('returns 404 when productId does not exist', async () => {
+			const { accessToken } = await registerAndLogin();
+			const res = await checkoutReq(accessToken, { productId: 99999, quantity: 1 });
+			expect(res.status).toBe(404);
+		});
+
+		it('returns 404 when product is inactive', async () => {
+			const { accessToken } = await registerAndLogin();
+			const inactive = await prisma.product.create({
+				data: { name: 'Gone', price: 500, isActive: false },
+			});
+			const res = await checkoutReq(accessToken, { productId: inactive.id, quantity: 1 });
+			expect(res.status).toBe(404);
 		});
 	});
 
@@ -175,18 +188,18 @@ describe('POST /api/payment/checkout', () => {
 				quantity: 1,
 				currency: 'eur',
 				status: 'PENDING',
-				description: 'Test product',
+				description: 'Test Product',
 			});
 		});
 
-		it('stores null description when omitted', async () => {
+		it('derives amountTotal from product.price × quantity', async () => {
 			const { accessToken } = await registerAndLogin();
-			await checkoutReq(accessToken, { amountTotal: 500, quantity: 2 });
+			await checkoutReq(accessToken, { productId: PRODUCT_ID, quantity: 3 });
 
 			const payment = await prisma.payment.findUnique({
 				where: { stripeSessionId: SESSION_ID },
 			});
-			expect(payment?.description).toBeNull();
+			expect(payment?.amountTotal).toBe(3000);
 		});
 	});
 
@@ -209,7 +222,6 @@ describe('POST /api/payment/checkout', () => {
 			} as any);
 			await checkoutReq(accessToken);
 
-			// Expire the pending session so the second request creates a new one
 			vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValueOnce({
 				status: 'expired',
 				url: null,
@@ -442,9 +454,7 @@ describe('POST /api/payment/webhook', () => {
 			const user = await seedUser();
 			const payment = await seedPayment(user.id, { status: 'PENDING' });
 
-			const res = await sendWebhook({
-				type: 'invoice.payment_succeeded',
-			});
+			const res = await sendWebhook({ type: 'invoice.payment_succeeded' });
 
 			expect(res.status).toBe(200);
 			expect(res.body).toEqual({ received: true });
@@ -456,10 +466,7 @@ describe('POST /api/payment/webhook', () => {
 			const res = await sendWebhook({
 				type: 'checkout.session.completed',
 				data: {
-					object: {
-						id: 'cs_ghost_unknown',
-						payment_intent: 'pi_ghost',
-					} as any,
+					object: { id: 'cs_ghost_unknown', payment_intent: 'pi_ghost' } as any,
 				},
 			});
 			expect(res.status).toBe(404);

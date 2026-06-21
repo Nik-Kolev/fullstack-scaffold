@@ -6,13 +6,12 @@ import { handleStripeEvent } from '../lib/stripeWebhook.js';
 import CustomError from '../utils/customError.js';
 
 export const createCheckoutSession = async (req: Request, res: Response) => {
-	const { amountTotal, quantity, description } = req.body;
+	const { productId, quantity } = req.body;
 
 	const { url } = await paymentService.createCheckoutSession(
 		req.user!.userId,
-		amountTotal,
+		productId,
 		quantity,
-		description,
 	);
 
 	res.status(201).json({ url });

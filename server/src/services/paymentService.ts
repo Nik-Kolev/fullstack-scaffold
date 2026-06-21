@@ -27,13 +27,18 @@ const getOrCreateStripeCustomer = async (
 
 export const createCheckoutSession = async (
 	userId: number,
-	amountTotal: number,
+	productId: number,
 	quantity: number,
-	description?: string,
 ) => {
 	const user = await prisma.user.findUnique({ where: { id: userId } });
 
 	if (!user) throw new CustomError(404, 'User not found.');
+
+	const product = await prisma.product.findUnique({ where: { id: productId } });
+	if (!product || !product.isActive) throw new CustomError(404, 'Product not found.');
+
+	const amountTotal = product.price * quantity;
+	const description = product.name;
 
 	const existingPending = await prisma.payment.findFirst({
 		where: { userId, status: 'PENDING' },

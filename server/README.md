@@ -90,8 +90,9 @@ prisma/
     user.prisma     User model
     refreshToken.prisma  RefreshToken model
     payment.prisma       PaymentStatus enum + Payment model
+    product.prisma       Product model
   migrations/       Auto-generated SQL migration history — commit these
-  seed.ts           Seed script — upserts dev/test users
+  seed.ts           Seed script — upserts dev/test users + seeds default products
 ```
 
 ## API Endpoints
@@ -112,8 +113,13 @@ prisma/
 | `DELETE /upload/:key`           | required | Delete a file (`key` must be URL-encoded)       |
 | `GET /upload/folder/:name`      | required | List all files in a named folder                |
 | `GET /upload/folders`           | required | List all distinct folder names for the user     |
-| `POST /payment/checkout`        | required | Create Stripe Checkout session, returns `{ url }` for redirect |
+| `POST /payment/checkout`        | required | Create Stripe Checkout session; body `{ productId, quantity }`, returns `{ url }` |
 | `POST /payment/webhook`         | —        | Stripe webhook — updates payment status on `checkout.session.completed/expired` and `charge.refunded` |
+| `GET /product`                  | —        | List all active products                                        |
+| `GET /product/:id`              | —        | Get a single product by ID (includes inactive)                  |
+| `POST /product`                 | admin    | Create a product; body `{ name, price, description?, imageUrl? }` |
+| `PUT /product/:id`              | admin    | Update a product (partial — at least one field required)        |
+| `DELETE /product/:id`           | admin    | Soft-delete a product (`isActive = false`)                      |
 
 ## Realtime (Socket.io)
 
@@ -190,7 +196,7 @@ Run `npm run db:seed` to populate the database with three default users:
 | `admin@abv.bg`        | `1234`   | `admin` |
 | `ngkolev93@gmail.com` | `1234`   | `admin` |
 
-The seed is idempotent — safe to run multiple times.
+The seed is idempotent — safe to run multiple times. It also seeds two products (`Basic Plan` at €9.99 and `Pro Plan` at €29.99) if no products exist yet.
 
 > `ngkolev93@gmail.com` is a personal test account — remove it from `seed.ts` (and this table) before sharing the repo or deploying anywhere publicly reachable.
 
