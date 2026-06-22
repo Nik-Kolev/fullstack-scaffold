@@ -1,6 +1,5 @@
-# Claude context (local only)
-CLAUDE.md
-ROADMAP.md
+# Claude personal config (local only — never commit)
+.claude/settings*.json
 
 # Logs
 logs
