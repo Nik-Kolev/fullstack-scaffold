@@ -6,36 +6,31 @@
 
 ## Up Next
 
-### 1. Client — Vite + React + TypeScript
+### 1. Client — pages + layout
 
-**Bootstrap:** `npm create vite@latest client -- --template react-ts`
-**Packages:** `react-router-dom`, `axios`
+Bootstrap, auth layer (axios instance, services, AuthContext, ProtectedRoute, router) done. Building pages now.
 
-Pages:
-- `/login`, `/register` — public
-- `/dashboard` — protected (redirect to `/login` if no user)
-- `/upload` — file upload demo
-- `/live` — WebSocket presence demo
+**Remaining infrastructure (add before or during first page):**
+- `sonner` toast — `npx shadcn add sonner`, add `<Toaster />` to Layout. Use for all API error feedback.
+- `components/shared/ErrorBoundary.tsx` — React Error Boundary wrapping the layout; shows fallback UI instead of blank screen on component crash.
+- `pages/NotFoundPage.tsx` — proper 404 page; replace the current `*` redirect with it. Redirect to `/dashboard` or `/login` from within the page based on auth state.
 
-Routing: React Router v6 with a `<ProtectedRoute>` wrapper that reads auth state.
+**Pages to build (stubs exist, need real implementation):**
+- `/login` — email/password form + Google OAuth button
+- `/register` — registration form
+- `/forgot-password` — email input, sends reset link
+- `/reset-password/:token` — new password form, reads token from URL
+- `/dashboard` — authenticated home, user info + feature overview
+- `/upload` — file upload demo (R2 integration)
+- `/live` — Socket.io presence demo (open two tabs, see each other online)
 
----
-
-### 2. Axios interceptor — auto token refresh
-
-**File:** `client/src/lib/axios.ts`
-
-This is the most important frontend pattern:
-
-1. Create base Axios instance with `baseURL` and `withCredentials: true`.
-2. Request interceptor: attach `Authorization: Bearer <accessToken>` from in-memory state (not localStorage — XSS risk).
-3. Response interceptor: on 401 response → call `POST /auth/refresh` → store new `accessToken` → retry original request with new token.
-4. If refresh also returns 401 → clear auth state → redirect to `/login`.
-5. Use a flag to prevent multiple simultaneous refresh calls (queue retries while refresh is in-flight).
+**Layout to build:**
+- `components/layout/Navbar.tsx` — top nav, converts to hamburger on mobile. Shows user name + logout. Admin-only links gated on `user.role`.
+- `components/layout/Layout.tsx` — wraps all protected pages with Navbar + Error Boundary.
 
 ---
 
-### 3. Full Dockerize
+### 2. Full Dockerize
 
 **Files:** `Dockerfile` (server), `client/Dockerfile`, `docker-compose.yml` (update)
 
