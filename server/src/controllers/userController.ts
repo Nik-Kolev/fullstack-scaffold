@@ -18,5 +18,5 @@ export const getUser = async (req: Request, res: Response) => {
 	if (!user) {
 		throw new CustomError(404, 'User not found.');
 	}
-	res.status(200).json(user);
+	res.status(200).json({ user });
 };

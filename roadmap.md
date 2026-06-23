@@ -77,7 +77,7 @@ Client Dockerfile:
 - No ownership check needed — server derives userId from JWT (`req.user!.userId`), client cannot influence whose data is fetched
 - `updateMe` has no explicit 404 guard — Prisma P2025 maps to 404 in `errorHandler`
 - P2002 (duplicate email) maps to 409 in `errorHandler` — no service-level handling needed
-- `GET /user/me` returns `{ user }` wrapper; `GET /user/:id` returns user directly (pre-existing, not changed)
+- All user endpoints return `{ user }` wrapper: `GET /user/me`, `GET /user/:id`, `PATCH /user/me`
 
 **FE Integration:**
 - `GET /user/me` → call on app mount to rehydrate user state after page refresh. Returns `{ user }` — full profile, no password field, includes computed `hasPassword: boolean`.

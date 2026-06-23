@@ -48,9 +48,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data: refreshData } = await authService.silentRefresh()
         setAccessToken(refreshData.accessToken)
-        const { data: userData } = await userService.getMe()
-        setUser(userData)
-        storeUser(userData)
+        const { data: meData } = await userService.getMe()
+        setUser(meData.user)
+        storeUser(meData.user)
       } catch {
         clearAccessToken()
         setUser(null)
@@ -79,14 +79,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
-    await authService.logout()
-    clearAccessToken()
-    setUser(null)
-    clearStoredUser()
+    try {
+      await authService.logout()
+    } finally {
+      clearAccessToken()
+      setUser(null)
+      clearStoredUser()
+    }
   }
 
   const changePassword = async (data: { currentPassword: string; newPassword: string }) => {
-    await authService.changePassword(data)
+    const { data: res } = await authService.changePassword(data)
+    handleAuthResponse(res)
   }
 
   const forgotPassword = async (data: { email: string }) => {
@@ -94,7 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const resetPassword = async (data: { token: string; password: string }) => {
-    await authService.resetPassword(data)
+    const { data: authData } = await authService.resetPassword(data)
+    handleAuthResponse(authData)
   }
 
   return (

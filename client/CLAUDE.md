@@ -23,6 +23,20 @@ See `roadmap.md` → `Completed ✓` for server API contracts and FE integration
 1. Run `npm run format`
 2. Update `client/README.md` if any of these changed: pages, env vars, project structure, commands, auth strategy
 
+### Service response types — verify the contract first
+
+Before typing a service call, check the actual server response shape. In order of preference:
+
+1. `roadmap.md → Completed ✓` — each server feature has an **FE Integration** block with the exact response shape.
+2. The server controller for that route — look at what it passes to `res.json(...)`.
+3. If unsure, ask — never guess.
+
+Common traps:
+
+- `GET /user/me`, `GET /user/:id`, and `PATCH /user/me` all return `{ user }` (wrapped), not a bare `User`.
+- `POST /auth/change-password` returns `{ user, accessToken, message }` — always call `handleAuthResponse` with the result.
+- `POST /auth/reset-password` returns `{ user, accessToken }` — user is logged in after reset; handle accordingly.
+
 ### Auth state
 
 - Access token: in memory only (never localStorage, never a cookie).
