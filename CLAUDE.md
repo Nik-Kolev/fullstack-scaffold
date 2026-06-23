@@ -9,7 +9,8 @@ Reusable fullstack starter. Goal: clean, copy-paste-friendly patterns. Prioritiz
 | Completed features + gotchas | `roadmap.md` → `Completed ✓` |
 | Server conventions + commands | `server/CLAUDE.md` |
 | Client conventions + API contracts | `client/CLAUDE.md` |
-| Formatter | `npm run format` from `server/` |
+| Formatter (server) | `npm run format` from `server/` |
+| Formatter (client) | `npm run format` from `client/` |
 | README to update on change | `server/README.md` |
 
 ---
