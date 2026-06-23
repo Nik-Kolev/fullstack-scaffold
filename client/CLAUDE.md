@@ -18,6 +18,11 @@ See `roadmap.md` → `Completed ✓` for server API contracts and FE integration
 
 `npm run format` from `client/` — runs Prettier with `prettier-plugin-tailwindcss` (auto-sorts Tailwind classes).
 
+### Before every commit
+
+1. Run `npm run format`
+2. Update `client/README.md` if any of these changed: pages, env vars, project structure, commands, auth strategy
+
 ### Auth state
 
 - Access token: in memory only (never localStorage, never a cookie).

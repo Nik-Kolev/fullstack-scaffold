@@ -30,7 +30,20 @@ Bootstrap, auth layer (axios instance, services, AuthContext, ProtectedRoute, ro
 
 ---
 
-### 2. Full Dockerize
+### 2. i18n — Internationalisation
+
+**Library:** `react-i18next` + `i18next`
+
+Initial languages: English (default) + Bulgarian.
+
+- Translation files in `client/public/locales/{en,bg}/translation.json`
+- `i18n.ts` config in `client/src/lib/` — initialises i18next, sets fallback to `en`, detects browser language
+- All user-facing strings use `t('key')` hook — no hardcoded English in JSX
+- Language switcher component in Navbar
+
+---
+
+### 3. Full Dockerize
 
 **Files:** `Dockerfile` (server), `client/Dockerfile`, `docker-compose.yml` (update)
 
@@ -43,6 +56,8 @@ Client Dockerfile:
 2. Stage `production`: nginx, copy `/dist` to `/usr/share/nginx/html`.
 
 `docker-compose.yml`: add `server` and `client` services, wire env vars, add named volumes for Postgres + Redis data persistence.
+
+> **Note:** Do after all FE pages and layout are complete.
 
 ---
 
