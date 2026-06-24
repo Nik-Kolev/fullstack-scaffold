@@ -6,9 +6,10 @@ Vite + React + TypeScript SPA. Connects to the Express server in `../server`.
 
 - **Build tool:** Vite 8
 - **UI:** React 19 + TypeScript 6
-- **Styling:** Tailwind CSS v4 + shadcn/ui (Radix primitives, Vega preset)
+- **Styling:** Tailwind CSS v4 + shadcn/ui (Radix primitives, Vega preset) + tw-animate-css
 - **HTTP:** Axios — single instance with Bearer token injection and 401 refresh queue
 - **Routing:** React Router v7
+- **i18n:** react-i18next — English (default) + Bulgarian; language stored in `localStorage`
 - **Formatter:** Prettier + prettier-plugin-tailwindcss
 
 ## Prerequisites
@@ -80,13 +81,19 @@ Form state and submit logic live in `hooks/` and are used inside components — 
 
 ## Pages
 
-| Path         | Auth     | Description                   |
-| ------------ | -------- | ----------------------------- |
-| `/login`     | public   | Email/password + Google OAuth |
-| `/register`  | public   | Account registration          |
-| `/dashboard` | required | Authenticated home            |
-| `/upload`    | required | File upload demo (R2)         |
-| `/live`      | required | WebSocket presence demo       |
+| Path                     | Auth     | Description                   |
+| ------------------------ | -------- | ----------------------------- |
+| `/`                      | public   | Home / landing page           |
+| `/terms`                 | public   | Terms of Service              |
+| `/privacy`               | public   | Privacy Policy                |
+| `/cookies`               | public   | Cookie Policy                 |
+| `/login`                 | public   | Email/password + Google OAuth |
+| `/register`              | public   | Account registration          |
+| `/forgot-password`       | public   | Request password reset email  |
+| `/reset-password/:token` | public   | Set new password via token    |
+| `/dashboard`             | required | Authenticated home            |
+| `/upload`                | required | File upload demo (R2)         |
+| `/live`                  | required | WebSocket presence demo       |
 
 ## Commands
 

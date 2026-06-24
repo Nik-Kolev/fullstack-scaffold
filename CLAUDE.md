@@ -95,7 +95,7 @@ STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing sec
 
 ## Current State
 
-**Next — Client (`roadmap.md` → Up Next → item 1):**
-Vite + React + TypeScript client. Bootstrap, packages, pages (login, register, dashboard, upload, live), protected routing.
+**Next — Client pages (`roadmap.md` → Up Next → item 1):**
+Bootstrap, auth layer, layout (Navbar/Footer/i18n/mobile hamburger) all done. Building pages now: login, register, forgot-password, reset-password, dashboard, upload, live. Add sonner toasts + ErrorBoundary + NotFoundPage before or during first page.
 
 Full implementation history, gotchas, and design notes for every completed feature: see `roadmap.md` → `Completed ✓`.

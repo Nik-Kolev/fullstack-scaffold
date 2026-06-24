@@ -6,9 +6,9 @@
 
 ## Up Next
 
-### 1. Client — pages + layout
+### 1. Client — pages
 
-Bootstrap, auth layer (axios instance, services, AuthContext, ProtectedRoute, router) done. Building pages now.
+Bootstrap, auth layer, layout layer, and i18n all done. Building pages now.
 
 **Remaining infrastructure (add before or during first page):**
 - `sonner` toast — `npx shadcn add sonner`, add `<Toaster />` to Layout. Use for all API error feedback.
@@ -24,26 +24,9 @@ Bootstrap, auth layer (axios instance, services, AuthContext, ProtectedRoute, ro
 - `/upload` — file upload demo (R2 integration)
 - `/live` — Socket.io presence demo (open two tabs, see each other online)
 
-**Layout to build:**
-- `components/layout/Navbar.tsx` — top nav, converts to hamburger on mobile. Shows user name + logout. Admin-only links gated on `user.role`.
-- `components/layout/Layout.tsx` — wraps all protected pages with Navbar + Error Boundary.
-
 ---
 
-### 2. i18n — Internationalisation
-
-**Library:** `react-i18next` + `i18next`
-
-Initial languages: English (default) + Bulgarian.
-
-- Translation files in `client/public/locales/{en,bg}/translation.json`
-- `i18n.ts` config in `client/src/lib/` — initialises i18next, sets fallback to `en`, detects browser language
-- All user-facing strings use `t('key')` hook — no hardcoded English in JSX
-- Language switcher component in Navbar
-
----
-
-### 3. Full Dockerize
+### 2. Full Dockerize
 
 **Files:** `Dockerfile` (server), `client/Dockerfile`, `docker-compose.yml` (update)
 
@@ -62,6 +45,45 @@ Client Dockerfile:
 ---
 
 ## Completed ✓
+
+### React Client — Layout layer + i18n
+Navbar, Footer, Layout wrapper, CookieBanner, page transitions, i18n (EN + BG), mobile hamburger.
+
+**Files:**
+- `src/components/layout/Navbar.tsx` — sticky top nav, desktop: 3-col grid (logo | centered links | lang+auth); mobile: `col-start-3` hamburger, absolute overlay menu with `animate-in slide-in-from-top-2 fade-in`; `useRef`+`document.mousedown` click-outside to close; `handleMobileNav` scrolls to top on link click
+- `src/components/layout/Footer.tsx` — `md:grid-cols-[auto_auto_auto]` (content-driven column widths, no language-inflation); mobile: `order-1`/`order-2` flips columns above brand; `col-span-2 md:col-span-1` for Legal column; column headers `uppercase tracking-wider`; description `text-center md:text-left`
+- `src/components/layout/Layout.tsx` — `key={location.pathname}` on outlet wrapper triggers `animate-in fade-in slide-in-from-bottom-4 duration-300` on every route change
+- `src/components/layout/CookieBanner.tsx` — localStorage-gated cookie consent banner
+- `src/index.css` — `scrollbar-gutter: stable` prevents layout shift between short/tall pages
+- `src/i18n/` — `react-i18next`, EN + BG, `t('key')` throughout, `i18nextLng` in localStorage; nav uses short keys (`nav.terms`, `nav.privacy`, `nav.cookies`)
+
+**Design decisions:**
+- `grid-cols-[auto_auto_auto]` over `grid-cols-3` (`1fr`): in a flex intrinsic-width context, `1fr` expands all columns to the widest column's max-content. `auto` sizes each column to its own content independently.
+- `w-fit` on the logo `<Link>`: CSS grid items stretch to fill their track regardless of `display: inline-flex` — `width: fit-content` is the only escape.
+- Backdrop click-outside avoided in favour of `useRef + document.mousedown`: a `fixed inset-0` backdrop inside the `<header>` (which sets a stacking context) renders above the header's own grid children, intercepting clicks on the close button. The `useRef` approach has no z-index dependency.
+- `behavior: 'instant'` in `handleMobileNav`: smooth scroll competes visually with the page fade-in animation. Instant scroll + animated content is cleaner than both animating simultaneously.
+
+---
+
+### React Client — Bootstrap + Auth layer
+Vite + React + TypeScript client. Axios instance, silent refresh on mount, AuthContext, ProtectedRoute, router.
+
+**Files:**
+- `src/main.tsx` — entry point; mounts React, imports global CSS and i18n
+- `src/App.tsx` — router shell; public routes + `<ProtectedRoute>` wrapping auth-gated pages
+- `src/lib/axios.ts` — Axios instance with `baseURL`, `withCredentials`, Bearer injection interceptor, 401 queue (one refresh fires, queued requests retry on new token)
+- `src/services/auth.ts` — `login`, `register`, `logout`, `refreshToken`, `forgotPassword`, `resetPassword`; all return typed shapes
+- `src/services/user.ts` — `getMe`, `updateMe`
+- `src/context/AuthContext.tsx` — holds `user + accessToken` in memory; rehydrates on mount via `GET /user/me` after silent refresh; exposes `login`, `logout`, `register`, `updateUser`
+- `src/components/shared/ProtectedRoute.tsx` — renders `<Outlet>` after auth is confirmed; redirects to `/login` on failure
+- `src/types/index.ts` — `User`, `AuthResponse` shared types
+
+**Design decisions:**
+- Access token in module-level variable inside `axios.ts` — not state, not localStorage. Lost on hard refresh; recovered by silent refresh before any protected route renders.
+- `isLoading` guard in `AuthContext` prevents protected routes from flashing before the silent refresh resolves.
+- 401 queue: `isRefreshing` flag + `failedQueue` array — only one `POST /auth/refresh` fires even if multiple requests 401 simultaneously; all queued callers retry with the new token.
+
+---
 
 ### User — /me endpoints
 `GET /user/me` and `PATCH /user/me` for authenticated self-service. `/me` routes registered before `/:id` to prevent param capture.

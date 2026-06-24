@@ -1,0 +1,90 @@
+{
+  "common": {
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "loading": "Loading...",
+    "or": "or"
+  },
+  "nav": {
+    "logoAlt": "Scaffold logo",
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "upload": "Upload",
+    "live": "Live",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "cookies": "Cookies"
+  },
+  "footer": {
+    "tagline": "A clean fullstack scaffold.",
+    "description": "A modern fullstack starter built with Express, Prisma, React, and Tailwind. Copy, customise, and ship.",
+    "columns": {
+      "pages": "Pages",
+      "company": "Company",
+      "legal": "Legal"
+    },
+    "links": {
+      "home": "Home",
+      "dashboard": "Dashboard",
+      "upload": "Upload",
+      "live": "Live",
+      "github": "GitHub",
+      "contact": "Contact",
+      "about": "About",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "cookies": "Cookie Policy"
+    },
+    "copyright": "All rights reserved."
+  },
+  "cookies": {
+    "message": "We use cookies for authentication and to improve your experience. By continuing you agree to our",
+    "policyLink": "Cookie Policy",
+    "accept": "Accept all",
+    "decline": "Decline"
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "Sign in to your account",
+      "forgotPassword": "Forgot your password?",
+      "noAccount": "Don't have an account?"
+    },
+    "register": {
+      "title": "Create an account",
+      "subtitle": "Get started today",
+      "hasAccount": "Already have an account?"
+    }
+  },
+  "pages": {
+    "lastUpdated": "Last updated: {{year}}",
+    "home": {
+      "title": "Scaffold",
+      "subtitle": "A clean fullstack starter."
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "welcome": "Welcome, {{name}}"
+    },
+    "upload": { "title": "Upload" },
+    "live": { "title": "Live" },
+    "terms": { "title": "Terms of Service" },
+    "privacy": { "title": "Privacy Policy" },
+    "cookies": { "title": "Cookie Policy" }
+  },
+  "errors": {
+    "required": "This field is required.",
+    "invalidEmail": "Invalid email address.",
+    "passwordMin": "Password must be at least 8 characters.",
+    "generic": "Something went wrong. Please try again."
+  }
+}

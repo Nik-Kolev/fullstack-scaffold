@@ -1,0 +1,90 @@
+{
+  "common": {
+    "login": "Вход",
+    "register": "Регистрация",
+    "logout": "Изход",
+    "email": "Имейл",
+    "password": "Парола",
+    "name": "Име",
+    "firstName": "Собствено име",
+    "lastName": "Фамилия",
+    "save": "Запази",
+    "cancel": "Отказ",
+    "submit": "Изпрати",
+    "loading": "Зареждане...",
+    "or": "или"
+  },
+  "nav": {
+    "logoAlt": "Лого на Scaffold",
+    "home": "Начало",
+    "dashboard": "Табло",
+    "upload": "Качване",
+    "live": "На живо",
+    "terms": "Условия",
+    "privacy": "Поверителност",
+    "cookies": "Бисквитки"
+  },
+  "footer": {
+    "tagline": "Изчистен fullstack scaffold.",
+    "description": "Модерен fullstack шаблон, изграден с Express, Prisma, React и Tailwind. Копирай, персонализирай и пусни.",
+    "columns": {
+      "pages": "Страници",
+      "company": "Компания",
+      "legal": "Правни"
+    },
+    "links": {
+      "home": "Начало",
+      "dashboard": "Табло",
+      "upload": "Качване",
+      "live": "На живо",
+      "github": "GitHub",
+      "contact": "Контакти",
+      "about": "За нас",
+      "terms": "Условия за ползване",
+      "privacy": "Политика за поверителност",
+      "cookies": "Политика за бисквитки"
+    },
+    "copyright": "Всички права запазени."
+  },
+  "cookies": {
+    "message": "Използваме бисквитки за удостоверяване и за подобряване на вашето изживяване. Като продължавате, вие се съгласявате с нашата",
+    "policyLink": "Политика за бисквитки",
+    "accept": "Приемам всички",
+    "decline": "Отказвам"
+  },
+  "auth": {
+    "login": {
+      "title": "Добре дошли отново",
+      "subtitle": "Влезте в акаунта си",
+      "forgotPassword": "Забравена парола?",
+      "noAccount": "Нямате акаунт?"
+    },
+    "register": {
+      "title": "Създайте акаунт",
+      "subtitle": "Започнете днес",
+      "hasAccount": "Вече имате акаунт?"
+    }
+  },
+  "pages": {
+    "lastUpdated": "Последна актуализация: {{year}}",
+    "home": {
+      "title": "Scaffold",
+      "subtitle": "Изчистен fullstack шаблон."
+    },
+    "dashboard": {
+      "title": "Табло",
+      "welcome": "Добре дошли, {{name}}"
+    },
+    "upload": { "title": "Качване" },
+    "live": { "title": "На живо" },
+    "terms": { "title": "Условия за ползване" },
+    "privacy": { "title": "Политика за поверителност" },
+    "cookies": { "title": "Политика за бисквитки" }
+  },
+  "errors": {
+    "required": "Това поле е задължително.",
+    "invalidEmail": "Невалиден имейл адрес.",
+    "passwordMin": "Паролата трябва да е поне 8 символа.",
+    "generic": "Нещо се обърка. Моля, опитайте отново."
+  }
+}
