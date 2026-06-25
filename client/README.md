@@ -10,6 +10,7 @@ Vite + React + TypeScript SPA. Connects to the Express server in `../server`.
 - **HTTP:** Axios — single instance with Bearer token injection and 401 refresh queue
 - **Routing:** React Router v7
 - **i18n:** react-i18next — English (default) + Bulgarian; language stored in `localStorage`
+- **Notifications:** sonner — toast component wired at app root; use `toast.success/error/info` anywhere
 - **Formatter:** Prettier + prettier-plugin-tailwindcss
 
 ## Prerequisites
@@ -56,7 +57,7 @@ src/
   pages/            Route-level components — thin, compose context + components
   components/
     layout/         Navbar, Layout wrapper
-    shared/         Reusable pieces — ProtectedRoute, LoadingSpinner …
+    shared/         Reusable pieces — ProtectedRoute, ErrorBoundary …
     ui/             shadcn generated primitives (Button, Input, Dialog …)
   types/            Shared TypeScript types
 ```
@@ -94,6 +95,7 @@ Form state and submit logic live in `hooks/` and are used inside components — 
 | `/dashboard`             | required | Authenticated home            |
 | `/upload`                | required | File upload demo (R2)         |
 | `/live`                  | required | WebSocket presence demo       |
+| `*`                      | public   | 404 — catch-all with go-home  |
 
 ## Commands
 
