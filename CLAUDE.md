@@ -95,7 +95,13 @@ STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing sec
 
 ## Current State
 
-**Next — Client pages (`roadmap.md` → Up Next → item 1):**
-Bootstrap, auth layer, layout (Navbar/Footer/i18n/mobile hamburger) all done. Building pages now: login, register, forgot-password, reset-password, dashboard, upload, live. Add sonner toasts + ErrorBoundary + NotFoundPage before or during first page.
+**Next — Client auth pages (in this order):**
+1. `/login` — email/password form + Google OAuth button
+2. `/register` — registration form
+3. Test login/logout/register end-to-end against real server
+4. `/forgot-password` — email input
+5. `/reset-password/:token` — new password form
+
+After auth works end-to-end: dashboard (real user greeting), then payment demo page and upload demo page. That completes the scaffold FE.
 
 Full implementation history, gotchas, and design notes for every completed feature: see `roadmap.md` → `Completed ✓`.

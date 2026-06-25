@@ -10,11 +10,6 @@
 
 Bootstrap, auth layer, layout layer, and i18n all done. Building pages now.
 
-**Remaining infrastructure (add before or during first page):**
-- `sonner` toast — `npx shadcn add sonner`, add `<Toaster />` to Layout. Use for all API error feedback.
-- `components/shared/ErrorBoundary.tsx` — React Error Boundary wrapping the layout; shows fallback UI instead of blank screen on component crash.
-- `pages/NotFoundPage.tsx` — proper 404 page; replace the current `*` redirect with it. Redirect to `/dashboard` or `/login` from within the page based on auth state.
-
 **Pages to build (stubs exist, need real implementation):**
 - `/login` — email/password form + Google OAuth button
 - `/register` — registration form
@@ -45,6 +40,25 @@ Client Dockerfile:
 ---
 
 ## Completed ✓
+
+### React Client — Sonner + ErrorBoundary + NotFoundPage
+Toast notifications, crash fallback, and 404 page for the client.
+
+**Files:**
+- `src/components/ui/sonner.tsx` — shadcn Toaster wrapper; custom lucide icons for success/info/warning/error/loading; `theme="system"`; CSS variable overrides (`--normal-bg`, `--normal-text`, `--normal-border`, `--border-radius`) tying toasts to the design system tokens
+- `src/components/shared/ErrorBoundary.tsx` — class component (required — React only supports error boundaries via `getDerivedStateFromError`, which has no hook equivalent); `componentDidCatch` logs to console; i18n fallback UI with Button back to `/`
+- `src/App.tsx` — `<ErrorBoundary>` wraps `<AuthProvider>` + `<Routes>`; `<Toaster />` sits outside `<Routes>` so it isn't re-mounted on route change; `*` catch-all moved inside `<Layout>` route so NotFoundPage gets navbar/footer
+- `src/pages/NotFoundPage.tsx` — 404 page; giant `text-[12rem]` number, title, message, "Go home" button always linking to `/` regardless of auth state; no `useAuth` needed
+
+**i18n keys added:** `errors.boundary.title/message/tryAgain/goHome`, `pages.notFound.title/message/goHome`
+
+**Design decisions:**
+- ErrorBoundary uses `i18n.t(...)` directly (not `useTranslation` hook) — class components can't use hooks; `i18n` is the singleton imported from the i18n config file
+- `<a href="/">` (not `<Link>`) in the ErrorBoundary fallback — if React Router itself is in a broken state, `<Link>` may not work; raw anchor forces a full page reload and resets all state
+- ErrorBoundary has both "Try again" (`setState({ hasError: false })`) and "Go home" — try again re-mounts the tree at the current URL for transient errors; go home forces a full reload as the guaranteed escape
+- NotFoundPage always links to `/` — dashboard was considered but `/` is safer since the scaffold may not have a dashboard page in every project built on top of it
+
+---
 
 ### React Client — Layout layer + i18n
 Navbar, Footer, Layout wrapper, CookieBanner, page transitions, i18n (EN + BG), mobile hamburger.

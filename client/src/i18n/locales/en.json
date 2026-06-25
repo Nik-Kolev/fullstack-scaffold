@@ -75,6 +75,11 @@
       "title": "Dashboard",
       "welcome": "Welcome, {{name}}"
     },
+    "notFound": {
+      "title": "Page not found",
+      "message": "The page you're looking for doesn't exist or has been moved.",
+      "goHome": "Go home"
+    },
     "upload": { "title": "Upload" },
     "live": { "title": "Live" },
     "terms": { "title": "Terms of Service" },
@@ -85,6 +90,12 @@
     "required": "This field is required.",
     "invalidEmail": "Invalid email address.",
     "passwordMin": "Password must be at least 8 characters.",
-    "generic": "Something went wrong. Please try again."
+    "generic": "Something went wrong. Please try again.",
+    "boundary": {
+      "title": "Something went wrong",
+      "message": "An unexpected error occurred. Please return home.",
+      "tryAgain": "Try again",
+      "goHome": "Go home"
+    }
   }
 }
