@@ -113,8 +113,8 @@ export const handleGoogleCallback = async (code: string) => {
 	const { data } = await google.oauth2('v2').userinfo.get({ auth: client });
 
 	const user = await prisma.user.upsert({
-		where: { googleId: `${data.id}` },
-		update: {},
+		where: { email: data.email as string },
+		update: { googleId: data.id as string },
 		create: {
 			googleId: data.id as string,
 			email: data.email as string,

@@ -17,14 +17,6 @@ const makeStore = (prefix: string) =>
 		prefix,
 	});
 
-export const authLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	limit: 10,
-	store: makeStore('rl:auth:'),
-	handler,
-	skip,
-});
-
 export const generalLimiter = rateLimit({
 	windowMs: 60 * 1000,
 	limit: 100,
@@ -33,26 +25,18 @@ export const generalLimiter = rateLimit({
 	skip,
 });
 
+export const authLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	limit: 10,
+	store: makeStore('rl:auth:'),
+	handler,
+	skip,
+});
+
 export const uploadLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	limit: 30,
 	store: makeStore('rl:upload:'),
-	handler,
-	skip,
-});
-
-export const refreshLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	limit: 60,
-	store: makeStore('rl:refresh:'),
-	handler,
-	skip,
-});
-
-export const logoutLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	limit: 30,
-	store: makeStore('rl:logout:'),
 	handler,
 	skip,
 });
