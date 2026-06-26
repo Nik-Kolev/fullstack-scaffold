@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import * as authService from '../services/authServices.js';
 import * as JWT from '../lib/jwt.js';
+import CustomError from '../utils/customError.js';
 
 export const createUser = async (req: Request, res: Response) => {
 	const { email, name, password } = req.body;
@@ -59,6 +60,11 @@ export const logoutUser = async (req: Request, res: Response) => {
 export const refreshToken = async (req: Request, res: Response) => {
 	const cookie = req.cookies.refreshToken;
 
+	if (!cookie) {
+		res.clearCookie('refreshToken');
+		throw new CustomError(401, 'No refresh token provided.');
+	}
+
 	try {
 		const token = JWT.verifyToken('refresh', cookie);
 
@@ -92,7 +98,7 @@ export const googleRedirect = (req: Request, res: Response) => {
 export const googleCallback = async (req: Request, res: Response) => {
 	const code = req.query.code as string;
 
-	const { accessToken, refreshToken } = await authService.handleGoogleCallback(code);
+	const { refreshToken, oauthCode } = await authService.handleGoogleCallback(code);
 
 	res.cookie('refreshToken', refreshToken.token, {
 		httpOnly: true,
@@ -101,7 +107,13 @@ export const googleCallback = async (req: Request, res: Response) => {
 		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
 	});
 
-	res.redirect(`${process.env.ORIGIN}?accessToken=${accessToken}`);
+	res.redirect(`${process.env.ORIGIN}/auth/callback?code=${oauthCode}`);
+};
+
+export const exchangeGoogleCode = async (req: Request, res: Response) => {
+	const { code } = req.body;
+	const result = await authService.exchangeGoogleCode(code);
+	res.status(200).json(result);
 };
 
 export const changePassword = async (req: Request, res: Response) => {

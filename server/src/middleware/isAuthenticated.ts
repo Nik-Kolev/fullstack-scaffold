@@ -5,9 +5,9 @@ import redis from '../lib/redis.js';
 
 export async function isAuth(req: Request, _res: Response, next: NextFunction) {
 	const authHeader = req.headers.authorization;
-	const token = authHeader?.split(' ')[1];
+	const [scheme, token] = authHeader?.split(' ') ?? [];
 
-	if (!token) {
+	if (scheme !== 'Bearer' || !token) {
 		throw new CustomError(401, 'Unauthorized.');
 	}
 

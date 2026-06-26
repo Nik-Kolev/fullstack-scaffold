@@ -51,3 +51,7 @@ export const resetPasswordSchema = z.object({
 			'Password must be at least 8 characters long, contain at least one letter and one number',
 		),
 });
+
+export const googleCodeSchema = z.object({
+	code: z.string().uuid('Invalid OAuth code format.'),
+});

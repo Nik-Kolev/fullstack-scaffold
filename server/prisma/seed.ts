@@ -2,11 +2,11 @@ import prisma from '../src/lib/prisma.js';
 import bcrypt from 'bcrypt';
 
 async function seedData() {
-	const hashedPassword = await bcrypt.hash('1234', 10);
+	const hashedPassword = await bcrypt.hash('password', 10);
 
 	const user = await prisma.user.upsert({
 		where: { email: 'test@abv.bg' },
-		update: {},
+		update: { password: hashedPassword },
 		create: {
 			email: 'test@abv.bg',
 			role: 'user',
@@ -17,7 +17,7 @@ async function seedData() {
 
 	const admin = await prisma.user.upsert({
 		where: { email: 'admin@abv.bg' },
-		update: {},
+		update: { password: hashedPassword },
 		create: {
 			email: 'admin@abv.bg',
 			role: 'admin',
@@ -28,7 +28,7 @@ async function seedData() {
 
 	const nik = await prisma.user.upsert({
 		where: { email: 'ngkolev93@gmail.com' },
-		update: {},
+		update: { password: hashedPassword },
 		create: {
 			email: 'ngkolev93@gmail.com',
 			role: 'admin',

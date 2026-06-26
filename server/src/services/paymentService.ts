@@ -104,6 +104,7 @@ export const updatePaymentBySessionId = async (
 	});
 
 	if (!payment) throw new CustomError(404, 'Payment not found.');
+	if (payment.status !== 'PENDING') return;
 
 	return prisma.payment.update({
 		where: { id: payment.id },
@@ -124,6 +125,7 @@ export const updatePaymentByPaymentIntentId = async (
 	});
 
 	if (!payment) throw new CustomError(404, 'Payment not found.');
+	if (payment.status === 'REFUNDED') return;
 
 	return prisma.payment.update({
 		where: { id: payment.id },

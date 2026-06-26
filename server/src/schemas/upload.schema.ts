@@ -1,5 +1,10 @@
 import z from 'zod';
 
 export const folderNameSchema = z.object({
-	folderName: z.string().min(1),
+	folderName: z
+		.string()
+		.regex(
+			/^[\w-]+$/,
+			'Folder name may only contain letters, numbers, underscores, and hyphens',
+		),
 });

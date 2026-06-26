@@ -37,6 +37,8 @@ export async function handleEmailJob(job: Job) {
 			});
 			break;
 		}
+		default:
+			throw new Error(`Unknown email job: ${job.name}`);
 	}
 }
 

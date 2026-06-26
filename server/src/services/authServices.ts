@@ -2,8 +2,9 @@ import prisma from '../lib/prisma.js';
 import type { Prisma } from '../generated/prisma/index.js';
 import * as JWT from '../lib/jwt.js';
 import CustomError from '../utils/customError.js';
+import { toSafeUser, type SafeUser } from '../utils/safeUser.js';
 import bcrypt from 'bcrypt';
-import OAuth2Client from '../lib/googleOAuth.js';
+import OAuth2Client, { createOAuthClient } from '../lib/googleOAuth.js';
 import { google } from 'googleapis';
 import redis from '../lib/redis.js';
 import { emailQueue } from '../lib/bullmq.js';
@@ -29,7 +30,7 @@ export const createUser = async (data: Prisma.UserCreateInput & { password: stri
 
 	await emailQueue.add('welcome', { name: user.name, email: user.email });
 
-	return { user, accessToken, refreshToken };
+	return { user: toSafeUser(user), accessToken, refreshToken };
 };
 
 export const loginUser = async (email: string, password: string) => {
@@ -68,9 +69,7 @@ export const loginUser = async (email: string, password: string) => {
 		},
 	});
 
-	const { password: _, ...user } = userMatch;
-
-	return { user, accessToken, refreshToken };
+	return { user: toSafeUser(userMatch), accessToken, refreshToken };
 };
 
 export const logoutUser = async (refreshTokenId: string) => {
@@ -107,10 +106,11 @@ export const getGoogleAuthUrl = () => {
 };
 
 export const handleGoogleCallback = async (code: string) => {
-	const { tokens } = await OAuth2Client.getToken(code);
-	OAuth2Client.setCredentials(tokens);
+	const client = createOAuthClient();
+	const { tokens } = await client.getToken(code);
+	client.setCredentials(tokens);
 
-	const { data } = await google.oauth2('v2').userinfo.get({ auth: OAuth2Client });
+	const { data } = await google.oauth2('v2').userinfo.get({ auth: client });
 
 	const user = await prisma.user.upsert({
 		where: { googleId: `${data.id}` },
@@ -132,7 +132,20 @@ export const handleGoogleCallback = async (code: string) => {
 		},
 	});
 
-	return { accessToken, refreshToken };
+	const oauthCode = crypto.randomUUID();
+	await redis.setex(
+		`oauth:code:${oauthCode}`,
+		30,
+		JSON.stringify({ accessToken, user: toSafeUser(user) }),
+	);
+
+	return { refreshToken, oauthCode };
+};
+
+export const exchangeGoogleCode = async (code: string) => {
+	const raw = await redis.getdel(`oauth:code:${code}`);
+	if (!raw) throw new CustomError(401, 'Invalid or expired OAuth code.');
+	return JSON.parse(raw) as { accessToken: string; user: SafeUser };
 };
 
 export const blacklistToken = async (jti: string, exp: number) => {
@@ -166,7 +179,7 @@ export const changePassword = async (
 	const newHashedPassword = await bcrypt.hash(newPassword, 10);
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
 
-	await prisma.$transaction([
+	const [, updatedUser] = await prisma.$transaction([
 		prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
 		prisma.user.update({ where: { id: user.id }, data: { password: newHashedPassword } }),
 		prisma.refreshToken.create({
@@ -180,8 +193,7 @@ export const changePassword = async (
 
 	await emailQueue.add('password-changed', { name: user.name, email: user.email });
 
-	const { password: _, ...safeUser } = user;
-	return { accessToken, refreshToken, user: { ...safeUser, hasPassword: true } };
+	return { accessToken, refreshToken, user: toSafeUser(updatedUser) };
 };
 
 export const forgotPassword = async (email: string) => {
@@ -204,8 +216,6 @@ export const forgotPassword = async (email: string) => {
 	});
 
 	await emailQueue.add('password-reset', { name: user.name, email: user.email, token: rawToken });
-
-	return rawToken; // controller ignores this — returned so tests can use the token directly
 };
 
 export const resetPassword = async (token: string, newPassword: string) => {
@@ -224,7 +234,7 @@ export const resetPassword = async (token: string, newPassword: string) => {
 
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user.user);
 
-	await prisma.$transaction([
+	const [, , updatedUser] = await prisma.$transaction([
 		prisma.refreshToken.deleteMany({ where: { userId: user.user.id } }),
 		prisma.passwordResetToken.deleteMany({ where: { passwordResetToken: tokenHash } }),
 		prisma.user.update({ where: { id: user.user.id }, data: { password: newHashedPassword } }),
@@ -239,5 +249,5 @@ export const resetPassword = async (token: string, newPassword: string) => {
 
 	await emailQueue.add('password-changed', { name: user.user.name, email: user.user.email });
 
-	return { accessToken, refreshToken, user: user.user };
+	return { accessToken, refreshToken, user: toSafeUser(updatedUser) };
 };

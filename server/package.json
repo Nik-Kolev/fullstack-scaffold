@@ -39,6 +39,7 @@
 		"jsonwebtoken": "^9.0.3",
 		"multer": "^2.2.0",
 		"pg": "^8.21.0",
+		"rate-limit-redis": "^5.0.0",
 		"react-email": "^6.5.0",
 		"resend": "^6.12.4",
 		"socket.io": "^4.8.3",
