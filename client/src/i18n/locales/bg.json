@@ -57,7 +57,8 @@
       "title": "Добре дошли отново",
       "subtitle": "Влезте в акаунта си",
       "forgotPassword": "Забравена парола?",
-      "noAccount": "Нямате акаунт?"
+      "noAccount": "Нямате акаунт?",
+      "googleButton": "Продължете с Google"
     },
     "register": {
       "title": "Създайте акаунт",

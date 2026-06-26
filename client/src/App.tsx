@@ -9,6 +9,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import CookiePolicyPage from '@/pages/CookiePolicyPage'
 import DashboardPage from '@/pages/DashboardPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
+import GoogleCallbackPage from '@/pages/GoogleCallbackPage'
 import HomePage from '@/pages/HomePage'
 import LivePage from '@/pages/LivePage'
 import LoginPage from '@/pages/LoginPage'
@@ -45,6 +46,7 @@ export default function App() {
             </Route>
 
             <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+            <Route path="/auth/callback" element={<GoogleCallbackPage />} />
           </Routes>
         </AuthProvider>
         <Toaster />

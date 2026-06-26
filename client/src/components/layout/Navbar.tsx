@@ -1,7 +1,7 @@
 import { Layers, LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/context/AuthContext'
@@ -20,7 +20,7 @@ const authLinks = [
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
-    'relative w-fit pb-1 text-foreground transition-colors',
+    'relative w-fit whitespace-nowrap pb-1 text-foreground transition-colors',
     'after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-foreground after:transition-transform after:duration-200',
     isActive ? 'after:scale-x-100' : 'after:scale-x-0 hover:after:scale-x-100',
   ].join(' ')
@@ -28,6 +28,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 export default function Navbar() {
   const { t, i18n } = useTranslation()
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
 
@@ -44,6 +45,10 @@ export default function Navbar() {
 
   const isEnglish = i18n.resolvedLanguage === 'en'
   const toggleLang = () => i18n.changeLanguage(isEnglish ? 'bg' : 'en')
+  const handleLogout = async () => {
+    await logout()
+    navigate('/')
+  }
   const closeMobile = () => setMenuOpen(false)
   const handleMobileNav = () => {
     setMenuOpen(false)
@@ -89,7 +94,7 @@ export default function Navbar() {
           <div className="hidden items-center gap-3 md:flex">
             <div className="bg-border h-5 w-px" />
             {user ? (
-              <Button variant="ghost" size="sm" onClick={logout}>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
                 {t('common.logout')}
               </Button>
@@ -138,8 +143,8 @@ export default function Navbar() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  logout()
+                onClick={async () => {
+                  await handleLogout()
                   handleMobileNav()
                 }}
               >

@@ -8,7 +8,7 @@ const handler = (_req: Request, _res: Response, next: NextFunction) => {
 	next(new CustomError(429, 'Too many requests, please try again later.'));
 };
 
-const skip = () => process.env.NODE_ENV === 'test';
+const skip = () => process.env.NODE_ENV !== 'production';
 
 const makeStore = (prefix: string) =>
 	new RedisStore({

@@ -6,7 +6,7 @@ type Props = {
   redirectTo?: string
 }
 
-export default function GuestRoute({ redirectTo = '/dashboard' }: Props) {
+export default function GuestRoute({ redirectTo = '/' }: Props) {
   const { isAuthenticated, isLoading } = useAuth()
 
   if (isLoading) {

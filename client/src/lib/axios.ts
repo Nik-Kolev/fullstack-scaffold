@@ -40,7 +40,8 @@ api.interceptors.response.use(
   async (error) => {
     const original: RetryableConfig = error.config
 
-    if (error.response?.status !== 401 || original._retry) {
+    const isAuthRoute = original.url?.includes('/auth/')
+    if (error.response?.status !== 401 || original._retry || isAuthRoute) {
       return Promise.reject(error)
     }
 

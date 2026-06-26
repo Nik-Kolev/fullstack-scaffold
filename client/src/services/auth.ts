@@ -16,7 +16,7 @@ export const changePassword = (data: { currentPassword: string; newPassword: str
 
 export const forgotPassword = (data: { email: string }) => api.post('/auth/forgot-password', data)
 
-export const resetPassword = (data: { token: string; password: string }) =>
+export const resetPassword = (data: { token: string; newPassword: string }) =>
   api.post<AuthResponse>('/auth/reset-password', data)
 
 export const silentRefresh = () =>
@@ -24,6 +24,5 @@ export const silentRefresh = () =>
     withCredentials: true,
   })
 
-export const googleLogin = () => {
-  window.location.href = `${import.meta.env.VITE_API_URL}/auth/google`
-}
+export const exchangeGoogleCode = (code: string) =>
+  api.post<AuthResponse>('/auth/google/exchange', { code })

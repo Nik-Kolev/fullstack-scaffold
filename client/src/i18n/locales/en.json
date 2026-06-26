@@ -57,7 +57,8 @@
       "title": "Welcome back",
       "subtitle": "Sign in to your account",
       "forgotPassword": "Forgot your password?",
-      "noAccount": "Don't have an account?"
+      "noAccount": "Don't have an account?",
+      "googleButton": "Continue with Google"
     },
     "register": {
       "title": "Create an account",

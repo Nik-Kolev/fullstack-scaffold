@@ -12,6 +12,7 @@ Vite + React + TypeScript SPA. Connects to the Express server in `../server`.
 - **i18n:** react-i18next — English (default) + Bulgarian; language stored in `localStorage`
 - **Notifications:** sonner — toast component wired at app root; use `toast.success/error/info` anywhere
 - **Formatter:** Prettier + prettier-plugin-tailwindcss
+- **E2E tests:** Playwright — Chromium, runs against the live dev server
 
 ## Prerequisites
 
@@ -44,6 +45,8 @@ Runs on `http://localhost:5173` by default.
 ## Project Structure
 
 ```
+e2e/                  Playwright e2e tests — auth setup + spec files
+playwright.config.ts  Playwright config — Chromium, baseURL localhost:5173
 src/
   main.tsx          Entry point — mounts React, imports global CSS
   App.tsx           Router shell — defines all routes and ProtectedRoute wrapper
@@ -56,8 +59,8 @@ src/
   hooks/            Form hooks — form state, validation, submit logic
   pages/            Route-level components — thin, compose context + components
   components/
-    layout/         Navbar, Layout wrapper
-    shared/         Reusable pieces — ProtectedRoute, ErrorBoundary …
+    layout/         Navbar, Layout wrapper, AuthHeader (auth pages only)
+    shared/         Reusable pieces — ProtectedRoute, GuestRoute, ErrorBoundary …
     ui/             shadcn generated primitives (Button, Input, Dialog …)
   types/            Shared TypeScript types
 ```
@@ -82,20 +85,21 @@ Form state and submit logic live in `hooks/` and are used inside components — 
 
 ## Pages
 
-| Path                     | Auth     | Description                   |
-| ------------------------ | -------- | ----------------------------- |
-| `/`                      | public   | Home / landing page           |
-| `/terms`                 | public   | Terms of Service              |
-| `/privacy`               | public   | Privacy Policy                |
-| `/cookies`               | public   | Cookie Policy                 |
-| `/login`                 | public   | Email/password + Google OAuth |
-| `/register`              | public   | Account registration          |
-| `/forgot-password`       | public   | Request password reset email  |
-| `/reset-password/:token` | public   | Set new password via token    |
-| `/dashboard`             | required | Authenticated home            |
-| `/upload`                | required | File upload demo (R2)         |
-| `/live`                  | required | WebSocket presence demo       |
-| `*`                      | public   | 404 — catch-all with go-home  |
+| Path                     | Auth     | Description                                          |
+| ------------------------ | -------- | ---------------------------------------------------- |
+| `/`                      | public   | Home / landing page                                  |
+| `/terms`                 | public   | Terms of Service                                     |
+| `/privacy`               | public   | Privacy Policy                                       |
+| `/cookies`               | public   | Cookie Policy                                        |
+| `/login`                 | public   | Email/password + Google OAuth                        |
+| `/auth/callback`         | public   | Google OAuth popup receiver — not navigable directly |
+| `/register`              | public   | Account registration                                 |
+| `/forgot-password`       | public   | Request password reset email                         |
+| `/reset-password/:token` | public   | Set new password via token                           |
+| `/dashboard`             | required | Authenticated home                                   |
+| `/upload`                | required | File upload demo (R2)                                |
+| `/live`                  | required | WebSocket presence demo                              |
+| `*`                      | public   | 404 — catch-all with go-home                         |
 
 ## Commands
 
@@ -106,3 +110,5 @@ Form state and submit logic live in `hooks/` and are used inside components — 
 | `npm run preview` | Preview the production build locally                                  |
 | `npm run lint`    | Run ESLint                                                            |
 | `npm run format`  | Format all files with Prettier (sorts Tailwind classes automatically) |
+| `npm run e2e`     | Run Playwright e2e tests (requires dev server + server running)       |
+| `npm run e2e:ui`  | Open Playwright interactive UI — run/watch individual tests visually  |
