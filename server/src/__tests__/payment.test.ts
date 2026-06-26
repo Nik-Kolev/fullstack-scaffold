@@ -142,6 +142,18 @@ describe('POST /api/payment/checkout', () => {
 			expect(res.status).toBe(400);
 		});
 
+		it('returns 400 when quantity is zero', async () => {
+			const { accessToken } = await registerAndLogin();
+			const res = await checkoutReq(accessToken, { productId: PRODUCT_ID, quantity: 0 });
+			expect(res.status).toBe(400);
+		});
+
+		it('returns 400 when quantity is negative', async () => {
+			const { accessToken } = await registerAndLogin();
+			const res = await checkoutReq(accessToken, { productId: PRODUCT_ID, quantity: -1 });
+			expect(res.status).toBe(400);
+		});
+
 		it('strips unknown fields and does not forward them to Stripe', async () => {
 			const { accessToken } = await registerAndLogin();
 			await checkoutReq(accessToken, {
@@ -237,6 +249,26 @@ describe('POST /api/payment/checkout', () => {
 	});
 
 	describe('pending session guard', () => {
+		it('returns the open session URL even when a different product is requested — guard is per-user, not per-product', async () => {
+			const { accessToken, userId } = await registerAndLogin();
+			const existingUrl = 'https://checkout.stripe.com/pay/existing';
+			const otherProduct = await prisma.product.create({
+				data: { name: 'Other Product', price: 500 },
+			});
+			await seedPayment(userId, { status: 'PENDING' });
+
+			vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValueOnce({
+				status: 'open',
+				url: existingUrl,
+			} as any);
+
+			const res = await checkoutReq(accessToken, { productId: otherProduct.id, quantity: 1 });
+
+			expect(res.status).toBe(201);
+			expect(res.body).toEqual({ url: existingUrl });
+			expect(vi.mocked(stripe.checkout.sessions.create)).not.toHaveBeenCalled();
+		});
+
 		it('returns existing url without creating a new session when PENDING session is still open', async () => {
 			const { accessToken, userId } = await registerAndLogin();
 			const existingUrl = 'https://checkout.stripe.com/pay/existing';
@@ -358,6 +390,25 @@ describe('POST /api/payment/webhook', () => {
 			expect(updated?.status).toBe('SUCCEEDED');
 			expect(updated?.stripePaymentIntentId).toBeNull();
 		});
+
+		it('is idempotent for an already-SUCCEEDED payment — does not overwrite stripePaymentIntentId', async () => {
+			const user = await seedUser();
+			await seedPayment(user.id, { status: 'SUCCEEDED', stripePaymentIntentId: PI_ID });
+
+			const res = await sendWebhook({
+				type: 'checkout.session.completed',
+				data: {
+					object: { id: SESSION_ID, payment_intent: 'pi_second_attempt' } as any,
+				},
+			});
+
+			expect(res.status).toBe(200);
+			const payment = await prisma.payment.findUnique({
+				where: { stripeSessionId: SESSION_ID },
+			});
+			expect(payment?.status).toBe('SUCCEEDED');
+			expect(payment?.stripePaymentIntentId).toBe(PI_ID);
+		});
 	});
 
 	describe('checkout.session.expired', () => {
@@ -424,6 +475,35 @@ describe('POST /api/payment/webhook', () => {
 			const updated = await prisma.payment.findUnique({ where: { id: payment.id } });
 			expect(updated?.status).toBe('PARTIALLY_REFUNDED');
 			expect(updated?.refundedAmountTotal).toBe(400);
+		});
+
+		it('is idempotent for an already-REFUNDED payment — does not overwrite refundedAt', async () => {
+			const user = await seedUser();
+			const originalRefundedAt = new Date('2024-01-01T00:00:00Z');
+			await seedPayment(user.id, {
+				status: 'REFUNDED',
+				stripePaymentIntentId: PI_ID,
+				refundedAt: originalRefundedAt,
+				refundedAmountTotal: 1000,
+			});
+
+			const res = await sendWebhook({
+				type: 'charge.refunded',
+				data: {
+					object: {
+						payment_intent: PI_ID,
+						amount: 1000,
+						amount_refunded: 1000,
+					} as any,
+				},
+			});
+
+			expect(res.status).toBe(200);
+			const payment = await prisma.payment.findFirst({
+				where: { stripePaymentIntentId: PI_ID },
+			});
+			expect(payment?.status).toBe('REFUNDED');
+			expect(payment?.refundedAt?.toISOString()).toBe(originalRefundedAt.toISOString());
 		});
 
 		it('skips silently when payment_intent is an expanded object instead of a string ID — Stripe expand[] API', async () => {

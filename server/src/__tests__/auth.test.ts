@@ -7,7 +7,8 @@ import redis from '../lib/redis.js';
 import { isAuth } from '../middleware/isAuthenticated.js';
 import errorHandler from '../middleware/errorHandler.js';
 import * as JWT from '../lib/jwt.js';
-import * as authService from '../services/authServices.js';
+import crypto from 'crypto';
+import { emailQueue } from '../lib/bullmq.js';
 
 vi.mock('../lib/bullmq.js', () => ({
 	emailQueue: { add: vi.fn() },
@@ -37,6 +38,7 @@ async function login() {
 }
 
 beforeEach(async () => {
+	vi.clearAllMocks();
 	await prisma.payment.deleteMany();
 	await prisma.passwordResetToken.deleteMany();
 	await prisma.refreshToken.deleteMany();
@@ -67,6 +69,12 @@ describe('POST /api/auth/register', () => {
 
 		expect(cookies.some((c) => c.startsWith('refreshToken='))).toBe(true);
 		expect(cookies.some((c) => c.toLowerCase().includes('httponly'))).toBe(true);
+	});
+
+	it('persists a RefreshToken row in the DB', async () => {
+		await register();
+		const count = await prisma.refreshToken.count();
+		expect(count).toBe(1);
 	});
 
 	it('returns 409 on duplicate email', async () => {
@@ -159,6 +167,18 @@ describe('POST /api/auth/refresh', () => {
 		expect(res.headers['set-cookie']).toBeDefined();
 	});
 
+	it('issues a different cookie value after rotation', async () => {
+		await register();
+		const loginRes = await login();
+		const oldCookie = getCookies(loginRes).find((c) => c.startsWith('refreshToken='))!;
+		const cookie = getCookies(loginRes).join('; ');
+
+		const refreshRes = await request(app).post('/api/auth/refresh').set('Cookie', cookie);
+		const newCookie = getCookies(refreshRes).find((c) => c.startsWith('refreshToken='))!;
+
+		expect(newCookie.split(';')[0]).not.toBe(oldCookie.split(';')[0]);
+	});
+
 	it('returns 401 with no cookie', async () => {
 		const res = await request(app).post('/api/auth/refresh');
 
@@ -207,6 +227,11 @@ describe('POST /api/auth/logout', () => {
 
 		const res = await request(app).post('/api/auth/logout').set('Cookie', cookie);
 
+		expect(res.status).toBe(204);
+	});
+
+	it('returns 204 with no refresh cookie (graceful)', async () => {
+		const res = await request(app).post('/api/auth/logout');
 		expect(res.status).toBe(204);
 	});
 
@@ -373,6 +398,22 @@ describe('POST /api/auth/change-password', () => {
 		expect(res.status).toBe(401);
 	});
 
+	it('stores blacklisted access token with positive TTL', async () => {
+		await register();
+		const {
+			body: { accessToken },
+		} = await login();
+		const payload = JWT.verifyToken('access', accessToken);
+
+		await changePasswordReq(accessToken, {
+			currentPassword: TEST_USER.password,
+			newPassword: 'NewPass5678',
+		});
+
+		const ttl = await redis.ttl(`blacklist:${payload.jti}`);
+		expect(ttl).toBeGreaterThan(0);
+	});
+
 	it('allows password set without currentPassword when user has no password', async () => {
 		const googleUser = await prisma.user.create({
 			data: { email: 'google@example.com', name: 'Google User', googleId: 'google-uid-123' },
@@ -454,9 +495,23 @@ describe('POST /api/auth/reset-password', () => {
 		return request(app).post('/api/auth/reset-password').send({ token, newPassword });
 	}
 
+	async function createResetToken(userId: number): Promise<string> {
+		const rawToken = crypto.randomBytes(32).toString('hex');
+		const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+		await prisma.passwordResetToken.create({
+			data: {
+				passwordResetToken: tokenHash,
+				userId,
+				expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+			},
+		});
+		return rawToken;
+	}
+
 	async function getResetToken(): Promise<string> {
 		await register();
-		return (await authService.forgotPassword(TEST_USER.email))!;
+		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+		return createResetToken(user!.id);
 	}
 
 	it('returns 200 with user, accessToken, and message', async () => {
@@ -498,10 +553,12 @@ describe('POST /api/auth/reset-password', () => {
 	});
 
 	it('invalidates all existing refresh tokens on reset', async () => {
+		await register();
 		const loginRes = await login();
 		const oldCookie = getCookies(loginRes).join('; ');
 
-		const token = (await authService.forgotPassword(TEST_USER.email)) as string;
+		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+		const token = await createResetToken(user!.id);
 		await resetPassword(token, 'NewPass5678');
 
 		const res = await request(app).post('/api/auth/refresh').set('Cookie', oldCookie);
@@ -516,16 +573,18 @@ describe('POST /api/auth/reset-password', () => {
 	it('returns 401 for an expired token', async () => {
 		await register();
 		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+		const rawToken = 'somerawtoken';
+		const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
 		await prisma.passwordResetToken.create({
 			data: {
-				passwordResetToken: 'expiredhash',
+				passwordResetToken: tokenHash,
 				userId: user!.id,
 				expiresAt: new Date(Date.now() - 1000),
 			},
 		});
 
-		const res = await resetPassword('somerawtoken', 'NewPass5678');
+		const res = await resetPassword(rawToken, 'NewPass5678');
 		expect(res.status).toBe(401);
 	});
 
@@ -594,8 +653,100 @@ describe('POST /api/auth/forgot-password', () => {
 		expect(second!.passwordResetToken).not.toBe(first!.passwordResetToken);
 	});
 
+	it('queues a password-reset email to the correct address', async () => {
+		await register();
+		await forgotPassword(TEST_USER.email);
+
+		expect(vi.mocked(emailQueue.add)).toHaveBeenCalledWith(
+			'password-reset',
+			expect.objectContaining({ email: TEST_USER.email }),
+		);
+	});
+
+	it('does not queue an email when user does not exist', async () => {
+		await forgotPassword('nobody@example.com');
+		expect(vi.mocked(emailQueue.add)).not.toHaveBeenCalledWith(
+			'password-reset',
+			expect.anything(),
+		);
+	});
+
 	it('returns 400 for invalid email format', async () => {
 		const res = await forgotPassword('not-an-email');
+		expect(res.status).toBe(400);
+	});
+});
+
+// ─── Google OAuth Exchange ────────────────────────────────────────────────────
+
+describe('POST /api/auth/google/exchange', () => {
+	async function seedOAuthCode(code: string) {
+		const user = await prisma.user.create({
+			data: {
+				email: 'google@example.com',
+				name: 'Google User',
+				googleId: 'gid-exchange-test',
+			},
+		});
+		const payload = {
+			accessToken: 'test-access-token',
+			user: {
+				id: user.id,
+				name: user.name,
+				email: user.email,
+				role: user.role,
+				hasPassword: false,
+				createdAt: user.createdAt,
+			},
+		};
+		await redis.setex(`oauth:code:${code}`, 30, JSON.stringify(payload));
+		return payload;
+	}
+
+	it('returns 200 with accessToken and user for a valid code', async () => {
+		const code = crypto.randomUUID();
+		const payload = await seedOAuthCode(code);
+
+		const res = await request(app).post('/api/auth/google/exchange').send({ code });
+
+		expect(res.status).toBe(200);
+		expect(res.body).toHaveProperty('accessToken', payload.accessToken);
+		expect(res.body.user).toMatchObject({ email: 'google@example.com' });
+	});
+
+	it('deletes the Redis key after exchange (one-time use)', async () => {
+		const code = crypto.randomUUID();
+		await seedOAuthCode(code);
+
+		await request(app).post('/api/auth/google/exchange').send({ code });
+
+		const key = await redis.get(`oauth:code:${code}`);
+		expect(key).toBeNull();
+	});
+
+	it('returns 401 on replay (one-time use enforced)', async () => {
+		const code = crypto.randomUUID();
+		await seedOAuthCode(code);
+
+		await request(app).post('/api/auth/google/exchange').send({ code });
+		const res = await request(app).post('/api/auth/google/exchange').send({ code });
+
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 401 for a valid UUID not present in Redis', async () => {
+		const res = await request(app)
+			.post('/api/auth/google/exchange')
+			.send({ code: crypto.randomUUID() });
+
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 400 for a non-UUID code format', async () => {
+		const res = await request(app)
+			.post('/api/auth/google/exchange')
+			.send({ code: 'not-a-uuid' });
+
 		expect(res.status).toBe(400);
 	});
 });

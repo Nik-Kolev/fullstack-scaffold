@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, vi } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
 import { emailQueue } from '../lib/bullmq.js';
 import emailWorker, { handleEmailJob } from '../workers/email.worker.js';
 import { Job, QueueEvents } from 'bullmq';
@@ -16,10 +16,15 @@ vi.mock('@react-email/render', () => ({
 const queueEvents = new QueueEvents('emails', { connection: redisConnectionOptions });
 
 describe('email worker', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
 	afterAll(async () => {
 		await emailWorker.close();
 		await queueEvents.close();
 		await emailQueue.obliterate({ force: true });
+		await emailQueue.close();
 	});
 
 	it('handles a welcome job', async () => {
@@ -33,8 +38,42 @@ describe('email worker', () => {
 		);
 	});
 
-	it('completes a welcome job end to end', async () => {
+	it('handles a password-reset job', async () => {
+		await handleEmailJob({
+			name: 'password-reset',
+			data: { name: 'Test', email: 'test@example.com', token: 'tok_abc123' },
+		} as Job);
+
+		expect(vi.mocked(sendEmail)).toHaveBeenCalledWith(
+			expect.objectContaining({ to: 'test@example.com', subject: 'Reset your password' }),
+		);
+	});
+
+	it('handles a password-changed job', async () => {
+		await handleEmailJob({
+			name: 'password-changed',
+			data: { name: 'Test', email: 'test@example.com' },
+		} as Job);
+
+		expect(vi.mocked(sendEmail)).toHaveBeenCalledWith(
+			expect.objectContaining({
+				to: 'test@example.com',
+				subject: 'Your password was changed',
+			}),
+		);
+	});
+
+	it('throws for an unrecognised job name so BullMQ marks it failed', async () => {
+		await expect(handleEmailJob({ name: 'unknown-event', data: {} } as Job)).rejects.toThrow(
+			'Unknown email job: unknown-event',
+		);
+	});
+
+	it('completes a welcome job end to end and calls sendEmail', async () => {
 		const job = await emailQueue.add('welcome', { name: 'Test', email: 'test@example.com' });
 		await expect(job.waitUntilFinished(queueEvents)).resolves.not.toThrow();
+		expect(vi.mocked(sendEmail)).toHaveBeenCalledWith(
+			expect.objectContaining({ to: 'test@example.com', subject: 'Welcome' }),
+		);
 	});
 });

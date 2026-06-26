@@ -147,4 +147,40 @@ describe('PATCH /api/user/me', () => {
 		const inDb = await prisma.user.findUnique({ where: { email: USER.email } });
 		expect(inDb?.role).toBe('user');
 	});
+
+	it('returns 200 when updating to the same email — idempotent', async () => {
+		const token = await registerAndLogin();
+		const res = await request(app)
+			.patch('/api/user/me')
+			.set('Authorization', `Bearer ${token}`)
+			.send({ email: USER.email });
+
+		expect(res.status).toBe(200);
+		expect(res.body.user.email).toBe(USER.email);
+	});
+
+	it('returns 200 when updating both name and email in one request', async () => {
+		const token = await registerAndLogin();
+		const res = await request(app)
+			.patch('/api/user/me')
+			.set('Authorization', `Bearer ${token}`)
+			.send({ name: 'Both Updated', email: 'both@example.com' });
+
+		expect(res.status).toBe(200);
+		expect(res.body.user.name).toBe('Both Updated');
+		expect(res.body.user.email).toBe('both@example.com');
+	});
+
+	it('GET /me reflects updated email immediately after PATCH', async () => {
+		const token = await registerAndLogin();
+		await request(app)
+			.patch('/api/user/me')
+			.set('Authorization', `Bearer ${token}`)
+			.send({ email: 'updated@example.com' });
+
+		const res = await request(app).get('/api/user/me').set('Authorization', `Bearer ${token}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.user.email).toBe('updated@example.com');
+	});
 });

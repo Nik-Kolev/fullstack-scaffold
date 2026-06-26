@@ -122,6 +122,26 @@ describe('GET /api/product', () => {
 		const res = await request(app).get('/api/product?limit=101');
 		expect(res.status).toBe(400);
 	});
+
+	it('each product in the list has the expected shape', async () => {
+		await seedProduct({
+			description: 'A fine widget',
+			imageUrl: 'https://example.com/img.png',
+		});
+
+		const res = await request(app).get('/api/product');
+
+		expect(res.status).toBe(200);
+		expect(res.body.products[0]).toMatchObject({
+			id: expect.any(Number),
+			name: 'Widget',
+			price: 999,
+			isActive: true,
+			description: 'A fine widget',
+			imageUrl: 'https://example.com/img.png',
+		});
+		expect(res.body.products[0].password).toBeUndefined();
+	});
 });
 
 // ─── GET /api/product/:id ────────────────────────────────────────────────────
@@ -505,6 +525,26 @@ describe('POST /api/product/:id/image', () => {
 
 		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
 		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/new.jpg');
+	});
+
+	it('returns 500 and preserves old imageUrl when deleteFile rejects during image replacement', async () => {
+		mockDeleteFile.mockRejectedValueOnce(new Error('R2 unavailable'));
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/old.jpg',
+		});
+
+		const res = await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', Buffer.from('fake'), {
+				filename: 'new.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		expect(res.status).toBe(500);
+		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
+		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/old.jpg');
 	});
 });
 

@@ -183,6 +183,38 @@ describe('POST /api/upload', () => {
 		const res = await req;
 		expect(res.status).toBe(400);
 	});
+
+	it('returns 500 and writes no DB rows when any uploadFile rejects', async () => {
+		const accessToken = await registerAndLogin();
+		vi.mocked(uploadFile)
+			.mockResolvedValueOnce('https://fake-public-url.test/1/images/a.png')
+			.mockRejectedValueOnce(new Error('R2 unavailable'));
+
+		const res = await uploadReq(accessToken)
+			.field('folderName', 'images')
+			.attach('files', Buffer.from('file one'), {
+				filename: 'a.png',
+				contentType: 'image/png',
+			})
+			.attach('files', Buffer.from('file two'), {
+				filename: 'b.png',
+				contentType: 'image/png',
+			});
+
+		expect(res.status).toBe(500);
+		const rows = await prisma.userFile.findMany();
+		expect(rows).toHaveLength(0);
+	});
+
+	it('returns 400 for a path-traversal folder name', async () => {
+		const accessToken = await registerAndLogin();
+		const res = await uploadReq(accessToken)
+			.field('folderName', '../secrets')
+			.attach('files', Buffer.from('x'), { filename: 'a.png', contentType: 'image/png' });
+
+		expect(res.status).toBe(400);
+		expect(uploadFile).not.toHaveBeenCalled();
+	});
 });
 
 describe('DELETE /api/upload/:key', () => {

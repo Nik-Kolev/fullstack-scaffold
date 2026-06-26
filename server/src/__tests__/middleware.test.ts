@@ -5,6 +5,7 @@ import { rateLimit } from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { isAuth } from '../middleware/isAuthenticated.js';
+
 import { requireRole } from '../middleware/requireRole.js';
 import errorHandler from '../middleware/errorHandler.js';
 import CustomError from '../utils/customError.js';
@@ -83,6 +84,27 @@ describe('isAuthenticated middleware', () => {
 
 		expect(res.status).toBe(401);
 	});
+
+	it('returns 401 for a non-Bearer authorization scheme', async () => {
+		const token = makeToken();
+		const res = await request(app).get('/protected').set('Authorization', `Basic ${token}`);
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 401 for an empty Bearer token', async () => {
+		const res = await request(app).get('/protected').set('Authorization', 'Bearer ');
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 401 for a token signed with the wrong secret', async () => {
+		const badToken = jwt.sign(
+			{ userId: 1, email: 'test@example.com', role: 'user', jti: crypto.randomUUID() },
+			'wrong-secret',
+			{ expiresIn: '15m' },
+		);
+		const res = await request(app).get('/protected').set('Authorization', `Bearer ${badToken}`);
+		expect(res.status).toBe(401);
+	});
 });
 
 // ─── requireRole ─────────────────────────────────────────────────────────────
@@ -104,6 +126,16 @@ describe('requireRole middleware', () => {
 
 	it('returns 403 when called without isAuth (no req.user)', async () => {
 		const res = await request(app).get('/admin-only');
+		expect(res.status).toBe(403);
+	});
+
+	it('returns 403 when the role claim is absent from the token', async () => {
+		const noRoleToken = jwt.sign(
+			{ userId: 1, email: 'test@example.com', jti: crypto.randomUUID() },
+			process.env.JWT_ACCESS_SECRET!,
+			{ expiresIn: '15m' },
+		);
+		const res = await request(app).get('/admin').set('Authorization', `Bearer ${noRoleToken}`);
 		expect(res.status).toBe(403);
 	});
 });
