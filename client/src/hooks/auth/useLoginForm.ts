@@ -46,8 +46,8 @@ export function useLoginForm() {
       await login(fields)
     } catch (err) {
       const message =
-        axios.isAxiosError(err) && err.response?.data?.error
-          ? (err.response.data.error as string)
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? (err.response.data.message as string)
           : t('errors.generic')
       toast.error(message)
     } finally {

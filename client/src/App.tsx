@@ -8,15 +8,15 @@ import ProtectedRoute from '@/components/shared/ProtectedRoute'
 import { AuthProvider } from '@/context/AuthContext'
 import CookiePolicyPage from '@/pages/CookiePolicyPage'
 import DashboardPage from '@/pages/DashboardPage'
-import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
-import GoogleCallbackPage from '@/pages/GoogleCallbackPage'
+import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
+import GoogleCallbackPage from '@/pages/auth/GoogleCallbackPage'
 import HomePage from '@/pages/HomePage'
 import LivePage from '@/pages/LivePage'
-import LoginPage from '@/pages/LoginPage'
+import LoginPage from '@/pages/auth/LoginPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import PrivacyPage from '@/pages/PrivacyPage'
-import RegisterPage from '@/pages/RegisterPage'
-import ResetPasswordPage from '@/pages/ResetPasswordPage'
+import RegisterPage from '@/pages/auth/RegisterPage'
+import ResetPasswordPage from '@/pages/auth/ResetPasswordPage'
 import TermsPage from '@/pages/TermsPage'
 import UploadPage from '@/pages/UploadPage'
 
@@ -45,7 +45,7 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             </Route>
 
-            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/auth/callback" element={<GoogleCallbackPage />} />
           </Routes>
         </AuthProvider>

@@ -1,49 +1,38 @@
 import axios from 'axios'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useAuth } from '@/context/AuthContext'
 
-type Fields = { name: string; email: string; password: string; confirmPassword: string }
+const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/
+
+type Fields = { newPassword: string; confirmPassword: string }
 type FieldErrors = Partial<Record<keyof Fields, string>>
 
-export function useRegisterForm() {
+export function useResetPasswordForm(token: string) {
   const { t } = useTranslation()
-  const { register } = useAuth()
+  const { resetPassword } = useAuth()
+  const navigate = useNavigate()
 
-  const [fields, setFields] = useState<Fields>({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  })
+  const [fields, setFields] = useState<Fields>({ newPassword: '', confirmPassword: '' })
   const [errors, setErrors] = useState<FieldErrors>({})
   const [isLoading, setIsLoading] = useState(false)
 
   const validate = (): boolean => {
     const next: FieldErrors = {}
-
-    if (!fields.name) next.name = t('errors.required')
-
-    if (!fields.email) {
-      next.email = t('errors.required')
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) {
-      next.email = t('errors.invalidEmail')
+    if (!fields.newPassword) {
+      next.newPassword = t('errors.required')
+    } else if (!passwordRegex.test(fields.newPassword)) {
+      next.newPassword = t('errors.passwordMin')
     }
-
-    if (!fields.password) {
-      next.password = t('errors.required')
-    } else if (fields.password.length < 8) {
-      next.password = t('errors.passwordMin')
-    }
-
     if (!fields.confirmPassword) {
       next.confirmPassword = t('errors.required')
-    } else if (fields.password && fields.confirmPassword !== fields.password) {
+      // guard prevents a false mismatch error when confirmPassword is filled but newPassword is still empty
+    } else if (fields.newPassword && fields.confirmPassword !== fields.newPassword) {
       next.confirmPassword = t('errors.passwordMismatch')
     }
-
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -59,11 +48,13 @@ export function useRegisterForm() {
     if (!validate()) return
     setIsLoading(true)
     try {
-      await register({ name: fields.name, email: fields.email, password: fields.password })
+      await resetPassword({ token, newPassword: fields.newPassword })
+      toast.success(t('auth.resetPassword.successMessage'))
+      navigate('/')
     } catch (err) {
       const message =
-        axios.isAxiosError(err) && err.response?.data?.error
-          ? (err.response.data.error as string)
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? (err.response.data.message as string)
           : t('errors.generic')
       toast.error(message)
     } finally {

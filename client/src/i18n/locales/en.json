@@ -13,7 +13,8 @@
     "submit": "Submit",
     "loading": "Loading...",
     "or": "or",
-    "confirmPassword": "Confirm password"
+    "confirmPassword": "Confirm password",
+    "newPassword": "New password"
   },
   "nav": {
     "logoAlt": "Scaffold logo",
@@ -66,6 +67,23 @@
       "subtitle": "Get started today",
       "hasAccount": "Already have an account?",
       "googleButton": "Continue with Google"
+    },
+    "forgotPassword": {
+      "title": "Forgot your password?",
+      "subtitle": "Enter your email and we'll send you a reset link.",
+      "button": "Send reset link",
+      "successTitle": "Check your inbox",
+      "successMessage": "If an account exists for that email, a reset link has been sent. Check your inbox.",
+      "backToLogin": "Back to login"
+    },
+    "resetPassword": {
+      "title": "Set a new password",
+      "subtitle": "Enter your new password below.",
+      "button": "Reset password",
+      "successTitle": "Password updated",
+      "successMessage": "Your password has been updated.",
+      "invalidToken": "This reset link is invalid or has expired.",
+      "requestNewLink": "Get a new link"
     }
   },
   "pages": {
@@ -92,7 +110,7 @@
   "errors": {
     "required": "This field is required.",
     "invalidEmail": "Invalid email address.",
-    "passwordMin": "Password must be at least 8 characters.",
+    "passwordMin": "Password must be at least 8 characters, contain a letter and a number.",
     "passwordMismatch": "Passwords do not match.",
     "generic": "Something went wrong. Please try again.",
     "boundary": {
