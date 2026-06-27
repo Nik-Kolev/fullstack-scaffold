@@ -1,6 +1,23 @@
 # fullstack-scaffold
 
-Reusable fullstack starter. Copy-paste-friendly patterns, clean architecture, production-ready features out of the box.
+Production-ready fullstack starter. Clean architecture, copy-paste-friendly patterns, and a full feature set so you can focus on building product instead of infrastructure.
+
+## What's Included
+
+| Feature | Details |
+|---|---|
+| **Auth** | Email/password + Google OAuth, JWT access (15 min) + refresh (7 d, httpOnly cookie), silent refresh on mount, token rotation, session revocation |
+| **Roles** | `user` and `admin` roles, `requireRole` guard middleware |
+| **Password flows** | Change password, forgot password (email link), reset password — all with email notifications |
+| **Email** | Resend + react-email templates (welcome, password reset, password changed), BullMQ-queued |
+| **Background jobs** | BullMQ — email queue worker, nightly token cleanup cron |
+| **File storage** | Cloudflare R2 (S3-compatible) — multi-file upload, folder listing, delete |
+| **Payments** | Stripe Checkout — one-time sessions, webhook handling, payment history |
+| **Realtime** | Socket.io — per-user rooms, JWT auth on every connection |
+| **Cache** | Redis — response caching, access token blacklisting on logout |
+| **i18n** | react-i18next — English + Bulgarian |
+| **UI** | Tailwind v4, shadcn/ui, Sonner toasts, ErrorBoundary, NotFoundPage |
+| **Testing** | Vitest + Supertest (server, 198 tests), Playwright e2e (client, auth flows) |
 
 ## Stack
 
@@ -25,16 +42,49 @@ fullstack-scaffold/
 
 ## Getting Started
 
-Start the server first, then the client — the client proxies API calls to the server.
+**Prerequisites:** Node.js 20+, Docker Desktop running.
 
 ```bash
 # Server
-cd server && npm install && cp .env.example .env
-npm run dev
+cd server
+npm install
+cp .env.example .env   # fill in your API keys — see server/README.md for where to get them
+npm run dev            # starts Docker containers, then the server on :8080
+npm run worker         # BullMQ worker (separate terminal) — handles email jobs, token cleanup cron
+# or start both together:
+npm run dev:all        # server + worker in one terminal, colour-coded output
 
 # Client (new terminal)
-cd client && npm install && cp .env.example .env
-npm run dev
+cd client
+npm install
+cp .env.example .env
+npm run dev            # starts the client on :5173
 ```
 
 See [`server/README.md`](server/README.md) and [`client/README.md`](client/README.md) for full setup, env vars, and commands.
+
+## Seed Data
+
+After starting the server, seed the database:
+
+```bash
+cd server && npm run db:seed
+```
+
+| Email | Password | Role |
+|---|---|---|
+| `test@abv.bg` | `password` | `user` |
+| `admin@abv.bg` | `password` | `admin` |
+
+## Third-Party Services
+
+The scaffold integrates several external services. All are free-tier friendly for development:
+
+| Service | Used for | Sign-up |
+|---|---|---|
+| Google Cloud Console | OAuth 2.0 | [console.cloud.google.com](https://console.cloud.google.com) |
+| Resend | Transactional email | [resend.com](https://resend.com) |
+| Cloudflare R2 | File storage | [dash.cloudflare.com](https://dash.cloudflare.com) |
+| Stripe | Payments | [dashboard.stripe.com](https://dashboard.stripe.com) |
+
+You can leave any service's env vars blank if you're not using that feature yet — unrelated routes will still work.

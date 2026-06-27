@@ -1,7 +1,7 @@
 # Client — Conventions
 
 See root `CLAUDE.md` for stack, project structure, and env vars.  
-See `roadmap.md → Completed ✓` for server API contracts and FE integration notes — each completed feature has a **FE Integration** block with the exact response shape.
+See `server/README.md → Frontend Integration Notes` for response shapes and API contract gotchas (payment cents, upload key encoding, auth state on change-password).
 
 ---
 
@@ -25,7 +25,7 @@ Form state and submit logic live in `hooks/` and are used inside components — 
 
 Before writing a service call, verify the server response shape. In order:
 
-1. `roadmap.md → Completed ✓` — each feature has an **FE Integration** block.
+1. `server/README.md → Frontend Integration Notes` — response shapes, gotchas, and contract details.
 2. The server controller for that route — look at what it passes to `res.json(...)`.
 
 Common shapes to know:

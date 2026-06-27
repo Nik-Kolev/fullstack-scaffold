@@ -6,7 +6,7 @@ Reusable fullstack starter. Goal: clean, copy-paste-friendly patterns. Prioritiz
 | Purpose | Location |
 |---|---|
 | Current state | `## Current State` section below |
-| Completed features + gotchas | `roadmap.md` → `Completed ✓` |
+| API contracts + FE integration notes | `server/README.md` → `Frontend Integration Notes` |
 | Server conventions + commands | `server/CLAUDE.md` |
 | Client conventions + API contracts | `client/CLAUDE.md` |
 | Formatter (server) | `npm run format` from `server/` |
@@ -58,7 +58,7 @@ fullstack-scaffold/
         ├── context/         # AuthContext (user + token state)
         ├── hooks/           # Form hooks by domain — hooks/auth/ (useLoginForm, useRegisterForm, useForgotPasswordForm, useResetPasswordForm)
         ├── i18n/            # react-i18next — en.json + bg.json
-        ├── lib/             # axios.ts (interceptors), utils.ts
+        ├── lib/             # axios.ts (interceptors), cn.ts (shadcn utility)
         ├── pages/           # Route-level components by domain — pages/auth/ (LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage)
         ├── services/        # auth.ts, user.ts — axios call functions
         └── types/           # Shared TS types (User, AuthResponse)
@@ -106,7 +106,5 @@ STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing sec
 
 ## Current State
 
-**Next — `/dashboard` page**
-Authenticated home page. Shows logged-in user info and a feature overview of what's in the scaffold (auth, uploads, payments, sockets). Protected by `ProtectedRoute`. Add e2e tests to `e2e/dashboard.spec.ts`.
-
-Full implementation history, gotchas, and design notes for every completed feature: see `roadmap.md` → `Completed ✓`.
+**Next — Full Docker setup**
+Add `server/Dockerfile` (multi-stage build), `client/Dockerfile` (multi-stage + nginx), update root `docker-compose.yml` to add `server` and `client` services with env vars and named volumes. Goal: `docker compose up` starts the entire stack for a new developer with no local Node/Postgres/Redis required.

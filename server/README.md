@@ -160,6 +160,30 @@ prisma/
 | `POST /product/:id/image`      | admin    | Replace product image; deletes old R2 object first                |
 | `DELETE /product/:id/image`    | admin    | Remove product image without deactivating                         |
 
+## Frontend Integration Notes
+
+Key contracts to know when writing frontend service calls:
+
+### Auth
+- `GET /user/me` → `{ user }` — includes `hasPassword: boolean` (computed). Use this, not `googleId`, to decide whether to show the current-password field on the change-password form. A Google user who has since set a password will have both `googleId` set and `hasPassword: true`.
+- `POST /auth/change-password` → `{ user, accessToken, message }` — replace the stored access token and cached user object on success. All other sessions are invalidated server-side.
+- `POST /auth/reset-password` → `{ user, accessToken }` — user is logged in immediately after reset.
+
+### Payments
+- `POST /payment/checkout` → `{ url }` — redirect to `url` immediately (Stripe-hosted checkout). Send `{ productId, quantity }`, never a raw price.
+- `payment.amountTotal` is stored and returned in **cents** (integer). Format for display: `new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amountTotal / 100)`.
+- After payment, wait for the DB to reflect `SUCCEEDED` (set by webhook) before showing a confirmation screen — don't trust the Stripe redirect query param alone.
+
+### File uploads
+- `DELETE /upload/:key` — always `encodeURIComponent(key)` when building the URL. Keys contain `/` (e.g. `42/images/<uuid>.png`); without encoding Express splits them across route segments and 404s.
+  ```ts
+  fetch(`/api/upload/${encodeURIComponent(key)}`, { method: 'DELETE' })
+  ```
+- Successful delete returns `204 No Content` — drop the file from local state, don't parse a body.
+- 404 on delete means the key is missing *or* belongs to another user — both cases return the same response on purpose.
+
+---
+
 ## Realtime (Socket.io)
 
 Every authenticated socket connection is auto-joined to a personal room (`user:${userId}`). To push a server-initiated event from any service:
