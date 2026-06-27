@@ -49,7 +49,6 @@ export default function Navbar() {
     await logout()
     navigate('/')
   }
-  const closeMobile = () => setMenuOpen(false)
   const handleMobileNav = () => {
     setMenuOpen(false)
     window.scrollTo({ top: 0, behavior: 'instant' })
