@@ -45,7 +45,10 @@ Runs on `http://localhost:5173` by default.
 ## Project Structure
 
 ```
-e2e/                  Playwright e2e tests — auth setup + spec files
+e2e/
+  auth.setup.ts       Logs in once and saves storageState for authenticated tests
+  login.spec.ts       16 tests — validation, server errors, happy path, logout, i18n, redirect
+  register.spec.ts    15 tests — validation, duplicate email, happy path, loading, logout, i18n, redirect
 playwright.config.ts  Playwright config — Chromium, baseURL localhost:5173
 src/
   main.tsx          Entry point — mounts React, imports global CSS
@@ -85,21 +88,21 @@ Form state and submit logic live in `hooks/` and are used inside components — 
 
 ## Pages
 
-| Path                     | Auth     | Description                                          |
-| ------------------------ | -------- | ---------------------------------------------------- |
-| `/`                      | public   | Home / landing page                                  |
-| `/terms`                 | public   | Terms of Service                                     |
-| `/privacy`               | public   | Privacy Policy                                       |
-| `/cookies`               | public   | Cookie Policy                                        |
-| `/login`                 | public   | Email/password + Google OAuth                        |
-| `/auth/callback`         | public   | Google OAuth popup receiver — not navigable directly |
-| `/register`              | public   | Account registration                                 |
-| `/forgot-password`       | public   | Request password reset email                         |
-| `/reset-password/:token` | public   | Set new password via token                           |
-| `/dashboard`             | required | Authenticated home                                   |
-| `/upload`                | required | File upload demo (R2)                                |
-| `/live`                  | required | WebSocket presence demo                              |
-| `*`                      | public   | 404 — catch-all with go-home                         |
+| Path                     | Auth     | Status | Description                                                         |
+| ------------------------ | -------- | ------ | ------------------------------------------------------------------- |
+| `/`                      | public   | ✓      | Home / landing page                                                 |
+| `/terms`                 | public   | ✓      | Terms of Service (static)                                           |
+| `/privacy`               | public   | ✓      | Privacy Policy (static)                                             |
+| `/cookies`               | public   | ✓      | Cookie Policy (static)                                              |
+| `/login`                 | public   | ✓      | Email/password form + Google OAuth popup; full e2e suite            |
+| `/auth/callback`         | public   | ✓      | Google OAuth redirect receiver — not navigable directly             |
+| `/register`              | public   | ✓      | Name/email/password form + Google OAuth; full e2e suite             |
+| `/forgot-password`       | public   | stub   | Email input — sends password reset link                             |
+| `/reset-password/:token` | public   | stub   | New password form — reads token from URL param                      |
+| `/dashboard`             | required | stub   | Authenticated home — user info + feature overview                   |
+| `/upload`                | required | stub   | File upload demo (Cloudflare R2)                                    |
+| `/live`                  | required | stub   | WebSocket presence demo (Socket.io — open two tabs, see each other) |
+| `*`                      | public   | ✓      | 404 — catch-all with go-home button                                 |
 
 ## Commands
 

@@ -12,7 +12,8 @@
     "cancel": "Отказ",
     "submit": "Изпрати",
     "loading": "Зареждане...",
-    "or": "или"
+    "or": "или",
+    "confirmPassword": "Потвърди паролата"
   },
   "nav": {
     "logoAlt": "Лого на Scaffold",
@@ -63,7 +64,8 @@
     "register": {
       "title": "Създайте акаунт",
       "subtitle": "Започнете днес",
-      "hasAccount": "Вече имате акаунт?"
+      "hasAccount": "Вече имате акаунт?",
+      "googleButton": "Продължете с Google"
     }
   },
   "pages": {
@@ -91,6 +93,7 @@
     "required": "Това поле е задължително.",
     "invalidEmail": "Невалиден имейл адрес.",
     "passwordMin": "Паролата трябва да е поне 8 символа.",
+    "passwordMismatch": "Паролите не съвпадат.",
     "generic": "Нещо се обърка. Моля, опитайте отново.",
     "boundary": {
       "title": "Нещо се обърка",

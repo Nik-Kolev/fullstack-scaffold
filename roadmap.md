@@ -11,8 +11,6 @@
 Bootstrap, auth layer, layout layer, and i18n all done. Building pages now.
 
 **Pages to build (stubs exist, need real implementation):**
-- `/login` — email/password form + Google OAuth button
-- `/register` — registration form
 - `/forgot-password` — email input, sends reset link
 - `/reset-password/:token` — new password form, reads token from URL
 - `/dashboard` — authenticated home, user info + feature overview
@@ -40,6 +38,53 @@ Client Dockerfile:
 ---
 
 ## Completed ✓
+
+### Register page + e2e suite
+Name/email/password/confirm-password form, Google OAuth, GuestRoute guard, full Playwright suite.
+
+**Files:**
+- `src/pages/RegisterPage.tsx` — 4-field form (name, email, password, confirmPassword); calls `useRegisterForm`; Google OAuth button calls `googleLogin()` from context; i18n throughout; `AuthHeader` for page header; link to `/login`
+- `src/hooks/useRegisterForm.ts` — form state, `validate()` (name required, email format, password min 8, confirm match), `handleChange` clears per-field errors on input, `handleSubmit` strips `confirmPassword` before calling `register()` from context
+- `src/i18n/locales/en.json` + `bg.json` — added `common.confirmPassword`, `errors.passwordMismatch`, `auth.register.googleButton`
+- `e2e/register.spec.ts` — 15 tests across 8 groups: client-side validation (5), server errors (1 — duplicate email), happy path (1), loading state (1), logout (4), Google OAuth button (1), i18n (1), authenticated redirect (1)
+
+**Design decisions:**
+- `confirmPassword` is FE-only — stripped before calling `register()`. Server never sees it.
+- Mismatch check is gated on `fields.password` being truthy — prevents "passwords do not match" on confirm when password is blank; "required" on password is the more informative error in that case.
+- Happy path + loading-state e2e tests use `Date.now()` email — register permanently writes to DB (unlike login which uses a seeded user). Run `npm run db:fresh` to clear accumulated test rows.
+- Google OAuth flow is identical to login — same `googleLogin()` from AuthContext; server upserts by `googleId`, returns the same `AuthResponse` shape.
+
+---
+
+### Login page + Google OAuth + Playwright e2e suite
+Email/password login, Google OAuth popup flow, GuestRoute guard, full Playwright suite.
+
+**Files:**
+- `src/pages/LoginPage.tsx` — email/password form; calls `useLoginForm` for state/validation/submit; Google OAuth button calls `googleLogin()`; i18n throughout; `AuthHeader` for the page header
+- `src/pages/GoogleCallbackPage.tsx` — OAuth redirect receiver; `useRef` guard prevents double-exchange in StrictMode; detects popup vs full-page context: popup posts `GOOGLE_AUTH_SUCCESS/ERROR` via `window.opener.postMessage`, full-page calls `googleExchange` then navigates
+- `src/components/layout/AuthHeader.tsx` — shared header for auth pages (logo + i18n toggle); keeps login/register pages visually consistent without the full Navbar
+- `src/components/shared/GuestRoute.tsx` — wraps public-only routes (`/login`, `/register`, etc.); redirects to `/` if `isAuthenticated && !isLoading`
+- `src/hooks/useLoginForm.ts` — form state, `validate()` (required + email format + password min 8), `handleChange` clears per-field errors on input, `handleSubmit` calls `login()` from context
+- `src/context/AuthContext.tsx` — added `googleLogin` (popup open + `message` listener + `popup.closed` poll for cleanup), `googleExchange` (stabilized with `useCallback`); `silentRefresh` init guarded by `useRef` to survive React StrictMode's double-invoke
+- `src/lib/axios.ts` — Bearer token injected via request interceptor; 401 response interceptor queues failed requests, fires one `POST /auth/refresh`, retries all queued callers with new token
+- `src/services/auth.ts` — added `exchangeGoogleCode`, `silentRefresh` service calls
+- `e2e/auth.setup.ts` — logs in once, saves storageState to `e2e/.auth/user.json`; reused by authenticated tests
+- `e2e/login.spec.ts` — 16 tests across 7 groups: client-side validation (4), server errors (2), happy path (1), loading state (1), Google OAuth button (1), logout (4), i18n (1)
+- `playwright.config.ts` — Chromium only, `fullyParallel: false`, `retries: 0`, `setup` project dependency
+- `server/src/middleware/rateLimiter.ts` — `skip` changed from `NODE_ENV === 'test'` to `NODE_ENV !== 'production'`; dev e2e runs were exhausting `authLimiter` (10 req / 15 min) across multiple runs
+
+**Design decisions:**
+- `useRef` StrictMode guard in `AuthContext`: React 18+ dev mode mounts → unmounts → remounts every component. Without the guard, two concurrent `silentRefresh` calls fire with the same token; the server rotates it on the first, rejects it on the second, clearing the authenticated user. `initRun.current` persists across the simulated remount; the ref resets only on a real page reload.
+- `useCallback` on `googleExchange`: it's a dependency of the `useEffect` in `GoogleCallbackPage`. Without memoization it's a new reference every render, re-running the effect each time AuthContext re-renders and firing multiple exchange requests — which exhausted `authLimiter` in a single Google login.
+- Authenticated redirect test isolated in its own top-level `describe`: the shared `Login page` `beforeEach` calls `page.goto('/login')` without mocks, which fires `silentRefresh` and rotates or consumes the storageState token before the test body runs. Moving it out means no shared `beforeEach` applies, and route mocks on `/auth/refresh` + `/user/me` make the test independent of real server state across runs.
+- `page.fill('user@example.com')` instead of `'a'` in the field-clear test: Chromium may not dispatch the `input` event on `type="email"` fields when the value fails browser-side email syntax checks, preventing React's `onChange` from firing and the error from clearing.
+- Rate limiter `skip` broadened to all non-production: dev e2e runs share the same Redis instance as manual testing; 10 requests in 15 minutes is easily exhausted across a few test suite invocations in a dev session. Production is the only environment that needs the real limit enforced.
+
+**FE Integration (for future pages):**
+- `GuestRoute` uses `isLoading` to avoid a flash-redirect: while `silentRefresh` is in flight `isAuthenticated` is `false` even for real users. The spinner holds rendering until `isLoading = false`.
+- `storageState` in Playwright captures localStorage + cookies at the moment of login; the refresh token in it is live and will be rotated by the first test that calls `silentRefresh`. Authenticated tests that need reliable redirect behavior must mock `/auth/refresh` + `/user/me` rather than depend on the raw token.
+
+---
 
 ### React Client — Sonner + ErrorBoundary + NotFoundPage
 Toast notifications, crash fallback, and 404 page for the client.

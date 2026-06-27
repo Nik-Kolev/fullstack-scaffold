@@ -12,7 +12,8 @@
     "cancel": "Cancel",
     "submit": "Submit",
     "loading": "Loading...",
-    "or": "or"
+    "or": "or",
+    "confirmPassword": "Confirm password"
   },
   "nav": {
     "logoAlt": "Scaffold logo",
@@ -63,7 +64,8 @@
     "register": {
       "title": "Create an account",
       "subtitle": "Get started today",
-      "hasAccount": "Already have an account?"
+      "hasAccount": "Already have an account?",
+      "googleButton": "Continue with Google"
     }
   },
   "pages": {
@@ -91,6 +93,7 @@
     "required": "This field is required.",
     "invalidEmail": "Invalid email address.",
     "passwordMin": "Password must be at least 8 characters.",
+    "passwordMismatch": "Passwords do not match.",
     "generic": "Something went wrong. Please try again.",
     "boundary": {
       "title": "Something went wrong",

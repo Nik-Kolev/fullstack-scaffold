@@ -11,7 +11,7 @@ Reusable fullstack starter. Goal: clean, copy-paste-friendly patterns. Prioritiz
 | Client conventions + API contracts | `client/CLAUDE.md` |
 | Formatter (server) | `npm run format` from `server/` |
 | Formatter (client) | `npm run format` from `client/` |
-| README to update on change | `server/README.md` |
+| README to update on change | `server/README.md` and `client/README.md` |
 
 ---
 
@@ -50,7 +50,18 @@ fullstack-scaffold/
 │   ├── scripts/             # db-fresh.mjs
 │   ├── prisma.config.ts     # Prisma 7 — datasource URL goes here, not in schema
 │   └── package.json
-└── client/                  # (future) Vite + React + TypeScript
+└── client/
+    ├── e2e/                 # Playwright — auth.setup.ts, login.spec.ts, register.spec.ts
+    ├── playwright.config.ts
+    └── src/
+        ├── components/      # layout/, shared/, ui/ (shadcn)
+        ├── context/         # AuthContext (user + token state)
+        ├── hooks/           # Form hooks — useLoginForm, useRegisterForm …
+        ├── i18n/            # react-i18next — en.json + bg.json
+        ├── lib/             # axios.ts (interceptors), utils.ts
+        ├── pages/           # Route-level components
+        ├── services/        # auth.ts, user.ts — axios call functions
+        └── types/           # Shared TS types (User, AuthResponse)
 ```
 
 ---
@@ -95,13 +106,9 @@ STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing sec
 
 ## Current State
 
-**Next — Client auth pages (in this order):**
-1. `/login` — email/password form + Google OAuth button
-2. `/register` — registration form
-3. Test login/logout/register end-to-end against real server
-4. `/forgot-password` — email input
-5. `/reset-password/:token` — new password form
+**Next — `/forgot-password` page**
+Email input form. Calls `forgotPassword()` from `AuthContext` (already wired — calls `POST /auth/forgot-password`). Server always returns 200 regardless of whether the email exists (prevents user enumeration). Show a success message on submit instead of redirecting. Add e2e tests to `e2e/forgot-password.spec.ts`.
 
-After auth works end-to-end: dashboard (real user greeting), then payment demo page and upload demo page. That completes the scaffold FE.
+After forgot-password: `/reset-password/:token`, then `/dashboard`. See `roadmap.md` → Up Next for full order.
 
 Full implementation history, gotchas, and design notes for every completed feature: see `roadmap.md` → `Completed ✓`.
