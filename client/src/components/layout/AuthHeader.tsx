@@ -15,6 +15,7 @@ export default function AuthHeader() {
       </Link>
       <button
         onClick={toggleLang}
+        data-testid="lang-toggle"
         aria-label={isEnglish ? 'Switch to Bulgarian' : 'Switch to English'}
         className="text-muted-foreground hover:text-foreground w-8 text-sm font-medium transition-colors"
       >

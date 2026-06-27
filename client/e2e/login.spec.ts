@@ -134,7 +134,7 @@ test.describe('Login page', () => {
   test.describe('i18n', () => {
     test('language toggle switches title to Bulgarian', async ({ page }) => {
       await expect(page.locator('h1')).toHaveText('Welcome back')
-      await page.locator('header button').first().click()
+      await page.locator('[data-testid="lang-toggle"]').click()
       await expect(page.locator('h1')).toHaveText('Добре дошли отново')
     })
   })
