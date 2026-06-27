@@ -9,15 +9,17 @@ See root `CLAUDE.md` for stack, project structure, and env vars.
 ```bash
 # Dev
 npm run dev               # starts Docker (predev), then nodemon + tsx
+npm run worker            # BullMQ worker process (separate terminal)
+npm run dev:all           # server + worker together, colour-coded output
 
 # Docker
-npm run docker:up         # start Postgres container only
+npm run docker:up         # start Postgres + Redis containers
 npm run docker:stop       # stop containers
 
 # Database
 npm run db:migrate        # prisma migrate dev (dev) + deploy to test DB
 npm run db:reset          # prisma migrate reset — wipe + re-apply dev DB only
-npm run db:fresh          # wipe migrations + full reset for dev AND test DB
+npm run db:fresh          # wipe migrations + reset dev AND test DB + seed
 npm run db:seed           # prisma db seed (runs prisma/seed.ts)
 npm run db:studio         # Prisma Studio
 

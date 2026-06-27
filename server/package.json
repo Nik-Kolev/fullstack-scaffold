@@ -9,16 +9,18 @@
 	"scripts": {
 		"dev": "nodemon --exec tsx --env-file .env --ext ts src/index.ts",
 		"predev": "kill-port 8080 || true && docker compose up -d",
+		"worker": "nodemon --exec tsx --env-file .env --ext ts src/worker.ts",
+		"predev:all": "kill-port 8080 || true && docker compose up -d",
+		"dev:all": "concurrently --names \"server,worker\" --prefix-colors green,blue \"nodemon --exec tsx --env-file .env --ext ts src/index.ts\" \"nodemon --exec tsx --env-file .env --ext ts src/worker.ts\"",
 		"docker:up": "docker compose up -d",
 		"docker:stop": "docker compose stop",
 		"db:migrate": "prisma migrate dev && dotenv -e .env.test -- prisma migrate deploy",
 		"db:reset": "prisma migrate reset",
-		"db:fresh": "node scripts/db-fresh.mjs && dotenv -e .env.test -- prisma migrate reset --force",
+		"db:fresh": "node scripts/db-fresh.mjs && dotenv -e .env.test -- prisma migrate reset --force && npm run db:seed",
 		"db:seed": "prisma db seed",
 		"db:studio": "prisma studio",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"worker": "nodemon --exec tsx --env-file .env --ext ts src/worker.ts",
 		"format": "prettier --write \"src/**/*.ts\""
 	},
 	"prisma": {
@@ -58,6 +60,7 @@
 		"@types/node": "^25.9.1",
 		"@types/pg": "^8.20.0",
 		"@types/supertest": "^7.2.0",
+		"concurrently": "^10.0.3",
 		"dotenv": "^17.4.2",
 		"dotenv-cli": "^11.0.0",
 		"kill-port": "^2.0.1",

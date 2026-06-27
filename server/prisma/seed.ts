@@ -26,16 +26,6 @@ async function seedData() {
 		},
 	});
 
-	const nik = await prisma.user.upsert({
-		where: { email: 'ngkolev93@gmail.com' },
-		update: { password: hashedPassword },
-		create: {
-			email: 'ngkolev93@gmail.com',
-			role: 'admin',
-			password: hashedPassword,
-			name: 'Nik',
-		},
-	});
 	const productCount = await prisma.product.count();
 	if (productCount === 0) {
 		await prisma.product.createMany({
@@ -46,7 +36,7 @@ async function seedData() {
 		});
 	}
 
-	console.log(user, admin, nik);
+	console.log(user, admin);
 }
 
 seedData()

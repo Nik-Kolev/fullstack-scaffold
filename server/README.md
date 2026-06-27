@@ -26,42 +26,83 @@ Express + TypeScript REST API with Prisma ORM and PostgreSQL.
 ## Getting Started
 
 ```bash
-# 1. Copy env file and fill in values
+# 1. Install dependencies
+npm install
+
+# 2. Copy env file and fill in values
 cp .env.example .env
 
-# 2. Start dev server (auto-starts DB container)
+# 3. Start dev server (auto-starts DB + Redis containers)
 npm run dev
+
+# Optional: start server + BullMQ worker together
+npm run dev:all
 ```
 
 ## Environment Variables
 
-| Variable               | Description                                     |
-| ---------------------- | ----------------------------------------------- |
-| `PORT`                 | Port the server listens on                      |
-| `ORIGIN`               | Allowed CORS origin (frontend URL)              |
-| `DATABASE_URL`         | PostgreSQL connection string                    |
-| `JWT_ACCESS_SECRET`    | Secret used to sign access tokens (15 min)      |
-| `JWT_REFRESH_SECRET`   | Secret used to sign refresh tokens (7 d)        |
-| `NODE_ENV`             | Set to `production` on deploy (gates secure cookie) |
-| `GOOGLE_CLIENT_ID`     | Google OAuth client ID                              |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret                        |
-| `GOOGLE_REDIRECT_URI`  | Must match authorized redirect URI in Google Cloud Console |
-| `REDIS_URL`            | Redis connection string (`redis://localhost:6379` in dev) |
-| `RESEND_API_KEY`       | Resend API key                                  |
-| `RESEND_FROM`          | Verified sender address (e.g. `onboarding@resend.dev` in dev) |
-| `RESEND_REPLY_TO`      | Address replies land in (e.g. your Gmail)       |
-| `R2_ACCOUNT_ID`        | Cloudflare account ID                           |
-| `R2_ACCESS_KEY_ID`     | R2 access key ID                                |
-| `R2_SECRET_ACCESS_KEY` | R2 secret access key                            |
-| `R2_BUCKET_NAME`       | R2 bucket name                                  |
-| `R2_PUBLIC_URL`        | Public base URL for the bucket (e.g. `https://pub-xxx.r2.dev`) |
-| `R2_ENDPOINT`          | R2 S3 API endpoint (EU: `https://<accountid>.eu.r2.cloudflarestorage.com`) |
-| `STRIPE_SECRET_KEY`    | Stripe secret key — Developers → API keys in Stripe Dashboard              |
-| `STRIPE_WEBHOOK_SECRET`| Stripe webhook signing secret — Developers → Webhooks in Stripe Dashboard  |
+### Core
 
-`DATABASE_URL` format: `postgresql://USER:PASSWORD@localhost:5432/DBNAME`
+| Variable             | Description                                                    |
+| -------------------- | -------------------------------------------------------------- |
+| `PORT`               | Port the server listens on                                     |
+| `ORIGIN`             | Allowed CORS origin (frontend URL)                             |
+| `DATABASE_URL`       | PostgreSQL connection string — format below                    |
+| `JWT_ACCESS_SECRET`  | Secret for signing access tokens (15 min) — any random string  |
+| `JWT_REFRESH_SECRET` | Secret for signing refresh tokens (7 d) — any random string    |
+| `NODE_ENV`           | Set to `production` on deploy — gates the `secure` cookie flag |
+| `REDIS_URL`          | Redis connection string (`redis://localhost:6379` in dev)       |
 
-The credentials must match the values in the root `.env` used by Docker Compose.
+`DATABASE_URL` format: `postgresql://USER:PASSWORD@localhost:5432/DBNAME`  
+Must match the credentials in the root `docker-compose.yml`.
+
+### Google OAuth
+
+> Get credentials at [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials → Create OAuth 2.0 Client ID.  
+> Add `GOOGLE_REDIRECT_URI` to the **Authorized redirect URIs** list in that same screen.
+
+| Variable               | Description                                       |
+| ---------------------- | ------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`     | OAuth client ID                                   |
+| `GOOGLE_CLIENT_SECRET` | OAuth client secret                               |
+| `GOOGLE_REDIRECT_URI`  | Must match an authorized redirect URI in GCP — e.g. `http://localhost:8080/api/auth/google/callback` |
+
+### Resend (email)
+
+> Get your API key at [resend.com](https://resend.com) → API Keys.  
+> In dev you can use `onboarding@resend.dev` as `RESEND_FROM` without verifying a domain.
+
+| Variable        | Description                                                   |
+| --------------- | ------------------------------------------------------------- |
+| `RESEND_API_KEY`| Resend API key                                                |
+| `RESEND_FROM`   | Sender address (e.g. `onboarding@resend.dev` in dev)          |
+| `RESEND_REPLY_TO` | Address where user replies land (e.g. your own inbox)       |
+
+### Cloudflare R2 (file storage)
+
+> Create a bucket at [dash.cloudflare.com](https://dash.cloudflare.com) → R2 → Create bucket.  
+> Enable **Public Access** on the bucket to get a `R2_PUBLIC_URL`.  
+> Generate R2 API keys under R2 → Manage R2 API Tokens.
+
+| Variable              | Description                                                            |
+| --------------------- | ---------------------------------------------------------------------- |
+| `R2_ACCOUNT_ID`       | Cloudflare account ID (from the R2 overview page)                      |
+| `R2_ACCESS_KEY_ID`    | R2 API token access key ID                                             |
+| `R2_SECRET_ACCESS_KEY`| R2 API token secret access key                                         |
+| `R2_BUCKET_NAME`      | Bucket name                                                            |
+| `R2_PUBLIC_URL`       | Public base URL for the bucket (e.g. `https://pub-xxx.r2.dev`)         |
+| `R2_ENDPOINT`         | R2 S3 API endpoint — EU: `https://<accountid>.eu.r2.cloudflarestorage.com` |
+
+### Stripe (payments)
+
+> Get keys at [dashboard.stripe.com](https://dashboard.stripe.com) → Developers → API keys.  
+> Get the webhook secret at Developers → Webhooks → your endpoint → Signing secret.  
+> In dev, use the Stripe CLI: `stripe listen --forward-to localhost:8080/api/payment/webhook`.
+
+| Variable               | Description                       |
+| ---------------------- | --------------------------------- |
+| `STRIPE_SECRET_KEY`    | Secret key (`sk_test_...` in dev) |
+| `STRIPE_WEBHOOK_SECRET`| Webhook signing secret            |
 
 ## Project Structure
 
@@ -77,75 +118,77 @@ src/
   middleware/       errorHandler, validateBody, isAuthenticated, requireRole, rateLimiter, redisCache, upload
   schemas/          Zod schemas — one file per domain (auth, upload, payment, product, user)
   types/            TypeScript augmentations (env.d.ts, express.d.ts)
-  lib/              Third-party singletons — prisma.ts, jwt.ts, redis.ts, bullmq.ts, googleOAuth.ts, resend.ts, r2.ts, stripe.ts
-  lib/socket/       Socket.io setup — socket.ts (initSocket + io singleton), room.ts (room rules), handlers.ts (handler registry), events/ (feature handlers)
-  emails/           react-email templates (welcome, passwordReset, passwordChanged), rendered by workers
-  workers/          BullMQ worker definitions — email.worker.ts, tokenCleanup.worker.ts; index.ts barrel-exports all
-  generated/        Auto-generated Prisma client — do not edit
+  lib/              Third-party singletons — prisma, jwt, redis, bullmq, googleOAuth, resend, r2, stripe
+  lib/socket/       Socket.io setup — socket.ts, room.ts, handlers.ts, events/
+  emails/           react-email templates (welcome, passwordReset, passwordChanged)
+  workers/          BullMQ worker definitions — email.worker.ts, tokenCleanup.worker.ts
   __tests__/        Integration tests
 
 prisma/
   schema/           Prisma schema files (one per domain)
-    base.prisma     Generator config
-    user.prisma     User model
-    refreshToken.prisma  RefreshToken model
-    payment.prisma       PaymentStatus enum + Payment model
-    product.prisma       Product model
   migrations/       Auto-generated SQL migration history — commit these
   seed.ts           Seed script — upserts dev/test users + seeds default products
 ```
 
 ## API Endpoints
 
-| Method & Path                  | Auth     | Description                                  |
-| ------------------------------ | -------- | --------------------------------------------- |
-| `POST /auth/register`          | —        | Create account, send welcome email            |
-| `POST /auth/login`             | —        | Issue access + refresh tokens                  |
-| `POST /auth/logout`             | —        | Revoke refresh token, clear cookie             |
-| `POST /auth/refresh`            | cookie   | Rotate refresh token, issue new access token   |
-| `GET /auth/google`              | —        | Start Google OAuth flow                        |
-| `GET /auth/google/callback`     | —        | Google OAuth callback, upsert by `googleId`    |
-| `POST /auth/change-password`    | required | Change password; invalidates other sessions    |
-| `POST /auth/forgot-password`    | —        | Always 200; emails a reset link if user exists |
-| `POST /auth/reset-password`     | —        | Reset password via emailed token               |
-| `GET /user/me`                  | required | Fetch the authenticated user's profile          |
-| `PATCH /user/me`                | required | Update own name or email                        |
-| `GET /user/:id`                 | —        | Fetch a user by ID                              |
-| `POST /upload`                  | required | Upload up to 10 files to a folder               |
-| `DELETE /upload/:key`           | required | Delete a file (`key` must be URL-encoded)       |
-| `GET /upload/folder/:name`      | required | List all files in a named folder                |
-| `GET /upload/folders`           | required | List all distinct folder names for the user     |
-| `POST /payment/checkout`        | required | Create Stripe Checkout session; body `{ productId, quantity }`, returns `{ url }` |
-| `POST /payment/webhook`         | —        | Stripe webhook — updates payment status on `checkout.session.completed/expired` and `charge.refunded` |
-| `GET /product`                  | —        | List active products; supports `?page=&limit=` (defaults 1/10) |
-| `GET /product/:id`              | —        | Get a single product by ID (includes inactive)                  |
-| `POST /product`                 | admin    | Create a product; multipart `{ name, price, description? }` + optional `image` file |
-| `PUT /product/:id`              | admin    | Update a product (partial — at least one field required)        |
-| `DELETE /product/:id`           | admin    | Soft-delete a product (`isActive = false`), deletes R2 image    |
-| `POST /product/:id/image`       | admin    | Replace product image; deletes old R2 object first              |
-| `DELETE /product/:id/image`     | admin    | Remove product image without deactivating                       |
+| Method & Path                  | Auth     | Description                                                      |
+| ------------------------------ | -------- | ----------------------------------------------------------------- |
+| `POST /auth/register`          | —        | Create account, send welcome email                                |
+| `POST /auth/login`             | —        | Issue access + refresh tokens                                     |
+| `POST /auth/logout`            | —        | Revoke refresh token, clear cookie                                |
+| `POST /auth/refresh`           | cookie   | Rotate refresh token, issue new access token                      |
+| `GET /auth/google`             | —        | Start Google OAuth flow                                           |
+| `GET /auth/google/callback`    | —        | Google OAuth callback, upsert by `googleId`                       |
+| `POST /auth/change-password`   | required | Change password; invalidates other sessions                       |
+| `POST /auth/forgot-password`   | —        | Always 200; emails a reset link if user exists                    |
+| `POST /auth/reset-password`    | —        | Reset password via emailed token                                  |
+| `GET /user/me`                 | required | Fetch the authenticated user's profile                            |
+| `PATCH /user/me`               | required | Update own name or email                                          |
+| `GET /user/:id`                | —        | Fetch a user by ID                                                |
+| `POST /upload`                 | required | Upload up to 10 files to a folder                                 |
+| `DELETE /upload/:key`          | required | Delete a file (`key` must be URL-encoded)                         |
+| `GET /upload/folder/:name`     | required | List all files in a named folder                                  |
+| `GET /upload/folders`          | required | List all distinct folder names for the user                       |
+| `POST /payment/checkout`       | required | Create Stripe Checkout session; body `{ productId, quantity }`, returns `{ url }` |
+| `POST /payment/webhook`        | —        | Stripe webhook — updates payment status on checkout/charge events |
+| `GET /product`                 | —        | List active products; supports `?page=&limit=` (defaults 1/10)   |
+| `GET /product/:id`             | —        | Get a single product by ID (includes inactive)                    |
+| `POST /product`                | admin    | Create a product; multipart `{ name, price, description? }` + optional `image` |
+| `PUT /product/:id`             | admin    | Update a product (partial — at least one field required)          |
+| `DELETE /product/:id`          | admin    | Soft-delete a product (`isActive = false`), deletes R2 image      |
+| `POST /product/:id/image`      | admin    | Replace product image; deletes old R2 object first                |
+| `DELETE /product/:id/image`    | admin    | Remove product image without deactivating                         |
 
 ## Realtime (Socket.io)
 
-Every authenticated socket connection is auto-joined to a personal room (`user:${userId}`). To push a server-initiated event from any service, import the `io` singleton from `lib/socket/socket.ts`:
+Every authenticated socket connection is auto-joined to a personal room (`user:${userId}`). To push a server-initiated event from any service:
 
 ```ts
-io.to(`user:${userId}`).emit('event-name', payload);
+import { io } from '../lib/socket/socket.js'
+io.to(`user:${userId}`).emit('event-name', payload)
 ```
 
-- Add role/feature rooms by adding entries to `lib/socket/room.ts`.
-- Add client-driven event handlers (client emits, server reacts) in `lib/socket/events/`, then import the file in the barrel `lib/socket/index.ts`.
+- Add role/feature rooms in `lib/socket/room.ts`.
+- Add client-driven event handlers in `lib/socket/events/`, then export from the barrel `lib/socket/index.ts`.
 
 ## Background Jobs (BullMQ)
 
-Workers run in a separate process from the HTTP server:
+Workers run in a separate process from the HTTP server. Start them alongside the dev server with:
 
 ```bash
-npm run worker
+npm run dev:all   # server + worker in one terminal (colour-coded output)
 ```
 
-- `email.worker.ts` — sends welcome / password-reset / password-changed emails via Resend, rendering templates from `emails/` with `@react-email/render`.
-- `tokenCleanup.worker.ts` — nightly cron (`0 3 * * *`) that deletes expired refresh tokens and password reset tokens.
+Or in separate terminals:
+
+```bash
+npm run dev       # HTTP server
+npm run worker    # BullMQ worker
+```
+
+- `email.worker.ts` — sends welcome / password-reset / password-changed emails via Resend.
+- `tokenCleanup.worker.ts` — nightly cron (`0 3 * * *`) that deletes expired refresh and password reset tokens.
 
 Any test that exercises a service which enqueues a job needs `vi.mock('../lib/bullmq.js', ...)`.
 
@@ -153,89 +196,87 @@ Any test that exercises a service which enqueues a job needs `vi.mock('../lib/bu
 
 ### Dev
 
-| Command            | Description                                            |
-| ------------------ | ------------------------------------------------------ |
-| `npm run dev`      | Start HTTP server with hot reload (auto-starts DB)     |
-| `npm run worker`   | Start BullMQ worker process with hot reload            |
+| Command          | Description                                           |
+| ---------------- | ----------------------------------------------------- |
+| `npm run dev`    | Start HTTP server with hot reload (auto-starts Docker) |
+| `npm run worker` | Start BullMQ worker process with hot reload            |
+| `npm run dev:all`| Start HTTP server + worker together (colour-coded)    |
 
 ### Docker
 
 | Command               | Description                     |
 | --------------------- | ------------------------------- |
-| `npm run docker:up`   | Start PostgreSQL container      |
-| `npm run docker:stop` | Stop container (data preserved) |
+| `npm run docker:up`   | Start PostgreSQL + Redis containers |
+| `npm run docker:stop` | Stop containers (data preserved)|
 
 ### Database
 
-| Command                               | Description                                                     |
-| ------------------------------------- | --------------------------------------------------------------- |
-| `npm run db:migrate -- --name <name>` | Create and apply a new migration (dev DB), then deploy it to the test DB |
-| `npm run db:reset`                    | Drop DB and re-apply all existing migrations (dev DB only)      |
-| `npm run db:fresh`                    | Wipe migration history + reset DB + create clean init migration (dev **and** test DB) |
-| `npm run db:studio`                   | Open Prisma Studio (browser DB viewer)                          |
-| `npm run db:seed`                     | Seed the database with dev users (idempotent)                   |
+| Command                               | Description                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| `npm run db:migrate -- --name <name>` | Create and apply a new migration (dev DB), then deploy to the test DB     |
+| `npm run db:reset`                    | Drop and re-apply all existing migrations (dev DB only)                   |
+| `npm run db:fresh`                    | Wipe migration history, reset dev + test DBs, then seed                   |
+| `npm run db:seed`                     | Seed the database with dev users and default products (idempotent)        |
+| `npm run db:studio`                   | Open Prisma Studio (browser DB viewer)                                    |
 
-> Both `db:migrate` and `db:fresh` keep the `scaffold_test` DB in sync automatically — there's no separate test-DB command to run.
+> `db:migrate` and `db:fresh` both keep the `scaffold_test` DB in sync automatically.
 
 ### Testing
 
-| Command              | Description                  |
-| -------------------- | ---------------------------- |
-| `npm run test`       | Run all tests                |
-| `npm run test:watch` | Run tests in watch mode      |
+| Command              | Description             |
+| -------------------- | ----------------------- |
+| `npm run test`       | Run all tests           |
+| `npm run test:watch` | Run tests in watch mode |
 
 ### Code
 
-| Command           | Description                        |
-| ----------------- | ---------------------------------- |
-| `npm run format`  | Format all TypeScript files        |
+| Command          | Description                 |
+| ---------------- | --------------------------- |
+| `npm run format` | Format all TypeScript files |
 
 ## Seed Data
 
-Run `npm run db:seed` to populate the database with three default users:
+Run `npm run db:seed` (or it runs automatically after `db:fresh`) to populate the database:
 
-| Email                 | Password | Role    |
-| --------------------- | -------- | ------- |
-| `test@abv.bg`         | `1234`   | `user`  |
-| `admin@abv.bg`        | `1234`   | `admin` |
-| `ngkolev93@gmail.com` | `1234`   | `admin` |
+| Email           | Password   | Role    |
+| --------------- | ---------- | ------- |
+| `test@abv.bg`   | `password` | `user`  |
+| `admin@abv.bg`  | `password` | `admin` |
 
 The seed is idempotent — safe to run multiple times. It also seeds two products (`Basic Plan` at €9.99 and `Pro Plan` at €29.99) if no products exist yet.
 
-> `ngkolev93@gmail.com` is a personal test account — remove it from `seed.ts` (and this table) before sharing the repo or deploying anywhere publicly reachable.
+> Add your own admin user to `prisma/seed.ts` before running in a new environment.
 
 ## Testing
 
-Tests use **Vitest** (test runner) and **Supertest** (HTTP assertions against the real Express app).
-
-Integration tests hit a real database. Set up the test database once before running tests:
+Tests use **Vitest** and **Supertest** against the real Express app and a dedicated test database.
 
 ```bash
-# 1. Create a separate test DB in Postgres (e.g. scaffold_test)
+# 1. Create a test DB in Postgres (e.g. scaffold_test)
 # 2. Copy .env and point DATABASE_URL at the test DB
 cp .env .env.test
 
-# 3. Apply migrations to the test DB once
+# 3. Apply migrations to the test DB
 dotenv -e .env.test -- prisma migrate deploy
 
 # 4. Run tests
 npm run test
 ```
 
-Tests clear relevant tables and Redis state in `beforeEach` — no manual cleanup needed between runs. `vitest.config.ts` sets `fileParallelism: false`: `auth.test.ts` and `upload.test.ts` both do blanket cleanup in `beforeEach`, and running test files in parallel lets one wipe the other's in-flight data.
+Tests clear relevant tables in `beforeEach` — no manual cleanup needed. `vitest.config.ts` sets `fileParallelism: false` to prevent test files that do blanket cleanup from wiping each other's in-flight data.
 
-> After that initial setup, `npm run db:migrate` and `npm run db:fresh` both keep the test DB in sync automatically.
+> After initial setup, `db:migrate` and `db:fresh` keep the test DB in sync automatically.
 
 ### Required `.env.test` values
 
-`.env.test` is gitignored — copy `.env` and adjust. In addition to the standard vars, the following are required for the full test suite to pass:
+`.env.test` is gitignored — copy `.env` and adjust. The following are required even for non-payment tests:
 
-| Variable | Test value | Why |
-|---|---|---|
-| `STRIPE_SECRET_KEY` | `sk_test_dummy` | `stripe.ts` initialises at module load — all test files that import `app` need this set, even those that don't test payments |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_dummy` | Same reason — referenced in `paymentController.ts` |
+| Variable               | Test value      | Why                                                          |
+| ---------------------- | --------------- | ------------------------------------------------------------ |
+| `STRIPE_SECRET_KEY`    | `sk_test_dummy` | `stripe.ts` initialises at module load — all files that import `app` need this set |
+| `STRIPE_WEBHOOK_SECRET`| `whsec_dummy`   | Same reason — referenced in `paymentController.ts`           |
 
-Payment tests mock the Stripe SDK entirely — no real API calls are made. The values above just prevent the Stripe constructor from throwing on startup.
+Payment tests mock the Stripe SDK entirely — no real API calls are made.
 
 ## Adding a New Model
 
@@ -243,7 +284,7 @@ Payment tests mock the Stripe SDK entirely — no real API calls are made. The v
 2. Define your model
 3. Run `npm run db:migrate -- --name <describe_the_change>`
 
-## Resetting the Database (clean slate)
+## Resetting the Database
 
 Use during early development when you want one clean migration instead of a chain of small ones:
 
@@ -251,13 +292,10 @@ Use during early development when you want one clean migration instead of a chai
 npm run db:fresh
 ```
 
-This deletes all migration files, drops the database, and creates a single fresh `init` migration from the current schema.
-
-> Only use this before others are using the project. After that, always use `db:migrate`.
+Wipes migration history, drops and recreates both the dev and test DBs, creates a single fresh `init` migration, then seeds. Only use this before others are working on the project — after that always use `db:migrate`.
 
 ## Deployment Notes
 
-- Set `NODE_ENV=production` in your hosting environment
-- This gates the `secure` flag on the refresh token cookie — required for HTTPS
+- Set `NODE_ENV=production` — gates the `secure` flag on the refresh token cookie (required for HTTPS)
 - Replace `DATABASE_URL` with your managed database connection string
-- `docker-compose.yml` is for local dev only — do not use it in production
+- `docker-compose.yml` is for local dev only — do not use in production
