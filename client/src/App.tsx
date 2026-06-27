@@ -4,21 +4,17 @@ import Layout from '@/components/layout/Layout'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import { Toaster } from '@/components/ui/sonner'
 import GuestRoute from '@/components/shared/GuestRoute'
-import ProtectedRoute from '@/components/shared/ProtectedRoute'
 import { AuthProvider } from '@/context/AuthContext'
 import CookiePolicyPage from '@/pages/CookiePolicyPage'
-import DashboardPage from '@/pages/DashboardPage'
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
 import GoogleCallbackPage from '@/pages/auth/GoogleCallbackPage'
 import HomePage from '@/pages/HomePage'
-import LivePage from '@/pages/LivePage'
 import LoginPage from '@/pages/auth/LoginPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import PrivacyPage from '@/pages/PrivacyPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 import ResetPasswordPage from '@/pages/auth/ResetPasswordPage'
 import TermsPage from '@/pages/TermsPage'
-import UploadPage from '@/pages/UploadPage'
 
 export default function App() {
   return (
@@ -31,11 +27,6 @@ export default function App() {
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/cookies" element={<CookiePolicyPage />} />
-              <Route element={<ProtectedRoute />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/upload" element={<UploadPage />} />
-                <Route path="/live" element={<LivePage />} />
-              </Route>
               <Route path="*" element={<NotFoundPage />} />
             </Route>
 

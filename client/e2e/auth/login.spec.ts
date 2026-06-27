@@ -101,16 +101,6 @@ test.describe('Login page', () => {
       await expect(page).toHaveURL('/')
     })
 
-    test('accessing protected route after logout redirects to login', async ({ page }) => {
-      await page
-        .getByRole('button', { name: /logout|изход/i })
-        .first()
-        .click()
-      await expect(page).toHaveURL('/')
-      await page.goto('/dashboard')
-      await expect(page).toHaveURL('/login')
-    })
-
     test('nav shows login and register buttons after logout', async ({ page }) => {
       await page
         .getByRole('button', { name: /logout|изход/i })

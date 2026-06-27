@@ -46,21 +46,25 @@ Runs on `http://localhost:5173` by default.
 
 ```
 e2e/
-  auth.setup.ts       Logs in once and saves storageState for authenticated tests
-  login.spec.ts       16 tests — validation, server errors, happy path, logout, i18n, redirect
-  register.spec.ts    15 tests — validation, duplicate email, happy path, loading, logout, i18n, redirect
-playwright.config.ts  Playwright config — Chromium, baseURL localhost:5173
+  auth/
+    auth.setup.ts             Logs in once and saves storageState for authenticated tests
+    login.spec.ts             15 tests — validation, server errors, happy path, logout, i18n, redirect
+    register.spec.ts          14 tests — validation, duplicate email, happy path, loading, logout, i18n, redirect
+    forgot-password.spec.ts   8 tests — validation, success state, loading, navigation, i18n, redirect
+    reset-password.spec.ts    12 tests — no-token state, validation, server errors, happy path, loading, i18n
+playwright.config.ts          Playwright config — Chromium, baseURL localhost:5173
 src/
   main.tsx          Entry point — mounts React, imports global CSS
-  App.tsx           Router shell — defines all routes and ProtectedRoute wrapper
+  App.tsx           Router shell — defines all routes and auth guards
   index.css         Tailwind v4 import + shadcn/ui CSS variables
   lib/
     axios.ts        Axios instance — baseURL, withCredentials, request/response interceptors
-    utils.ts        shadcn cn() helper — merges Tailwind class names
-  services/         API call functions — one file per domain (auth, user, upload …)
+    cn.ts           shadcn cn() helper — merges Tailwind class names safely
+  services/         API call functions — one file per domain (auth, user …)
   context/          React context providers — hold state, consume services
-  hooks/            Form hooks — form state, validation, submit logic
-  pages/            Route-level components — thin, compose context + components
+  hooks/            Form hooks by domain — form state, validation, submit logic
+  pages/            Route-level components
+    auth/           Auth pages — Login, Register, ForgotPassword, ResetPassword, GoogleCallback
   components/
     layout/         Navbar, Layout wrapper, AuthHeader (auth pages only)
     shared/         Reusable pieces — ProtectedRoute, GuestRoute, ErrorBoundary …
@@ -88,21 +92,18 @@ Form state and submit logic live in `hooks/` and are used inside components — 
 
 ## Pages
 
-| Path                     | Auth     | Status | Description                                                         |
-| ------------------------ | -------- | ------ | ------------------------------------------------------------------- |
-| `/`                      | public   | ✓      | Home / landing page                                                 |
-| `/terms`                 | public   | ✓      | Terms of Service (static)                                           |
-| `/privacy`               | public   | ✓      | Privacy Policy (static)                                             |
-| `/cookies`               | public   | ✓      | Cookie Policy (static)                                              |
-| `/login`                 | public   | ✓      | Email/password form + Google OAuth popup; full e2e suite            |
-| `/auth/callback`         | public   | ✓      | Google OAuth redirect receiver — not navigable directly             |
-| `/register`              | public   | ✓      | Name/email/password form + Google OAuth; full e2e suite             |
-| `/forgot-password`       | public   | stub   | Email input — sends password reset link                             |
-| `/reset-password/:token` | public   | stub   | New password form — reads token from URL param                      |
-| `/dashboard`             | required | stub   | Authenticated home — user info + feature overview                   |
-| `/upload`                | required | stub   | File upload demo (Cloudflare R2)                                    |
-| `/live`                  | required | stub   | WebSocket presence demo (Socket.io — open two tabs, see each other) |
-| `*`                      | public   | ✓      | 404 — catch-all with go-home button                                 |
+| Path               | Auth   | Description                                                                |
+| ------------------ | ------ | -------------------------------------------------------------------------- |
+| `/`                | public | Home / landing page                                                        |
+| `/terms`           | public | Terms of Service (static)                                                  |
+| `/privacy`         | public | Privacy Policy (static)                                                    |
+| `/cookies`         | public | Cookie Policy (static)                                                     |
+| `/login`           | guest  | Email/password form + Google OAuth popup; full e2e suite                   |
+| `/register`        | guest  | Name/email/password form + Google OAuth; full e2e suite                    |
+| `/forgot-password` | guest  | Email input — sends password reset link; full e2e suite                    |
+| `/reset-password`  | public | New password form — reads token from query param `?token=`; full e2e suite |
+| `/auth/callback`   | public | Google OAuth redirect receiver — not navigable directly                    |
+| `*`                | public | 404 — catch-all with go-home button                                        |
 
 ## Commands
 

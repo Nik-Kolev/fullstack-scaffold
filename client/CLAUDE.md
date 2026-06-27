@@ -1,44 +1,62 @@
 # Client — Conventions
 
-See root `CLAUDE.md` for stack, project structure, and env vars.
-See `roadmap.md` → `Completed ✓` for server API contracts and FE integration notes — each completed feature has a **FE Integration** block. Read it at the start of every client session.
+See root `CLAUDE.md` for stack, project structure, and env vars.  
+See `roadmap.md → Completed ✓` for server API contracts and FE integration notes — each completed feature has a **FE Integration** block with the exact response shape.
 
 ---
 
-## Conventions
+## Architecture
 
-### Architecture
+**Service → Context → Component** — strictly separated layers:
 
-- **Service → Context → Component.** API calls live in `services/` (one file per domain). Context consumes the service and holds state. Components consume via hook. Never a direct fetch inside a component or context bypassing the service.
-- **Form hooks in `hooks/`.** Form state, validation, and submit logic go in a dedicated hook used inside the component — not in context.
-- **Unique CSS prefix per component.** Abbreviation from the component name (e.g. `UserProfileCard → upc-`). Prevents class name collisions without needing CSS modules.
-- **Mobile-first — non-negotiable.** Every layout must be usable on mobile. Top navbar converts to hamburger on small screens. Design mobile layout first, expand for desktop.
+- `services/` — axios call functions only. No state, no side effects.
+- `context/` — consumes services, owns state, exposes it via hooks.
+- `components/` and `pages/` — consume context via hooks. Never call a service directly from a component.
 
-### Formatter
+Form state and submit logic live in `hooks/` and are used inside components — not in context.
 
-`npm run format` from `client/` — runs Prettier with `prettier-plugin-tailwindcss` (auto-sorts Tailwind classes).
+**CSS prefix per component.** Pick an abbreviation from the component name (e.g. `UserProfileCard → upc-`). Prevents class name collisions without CSS modules.
 
-### Before every commit
+**Mobile-first.** Design mobile layout first, expand for desktop. The navbar converts to a hamburger on small screens.
 
-1. Run `npm run format`
-2. Update `client/README.md` if any of these changed: pages, env vars, project structure, commands, auth strategy
+---
 
-### Service response types — verify the contract first
+## API response contracts
 
-Before typing a service call, check the actual server response shape. In order of preference:
+Before writing a service call, verify the server response shape. In order:
 
-1. `roadmap.md → Completed ✓` — each server feature has an **FE Integration** block with the exact response shape.
+1. `roadmap.md → Completed ✓` — each feature has an **FE Integration** block.
 2. The server controller for that route — look at what it passes to `res.json(...)`.
-3. If unsure, ask — never guess.
 
-Common traps:
+Common shapes to know:
 
-- `GET /user/me`, `GET /user/:id`, and `PATCH /user/me` all return `{ user }` (wrapped), not a bare `User`.
-- `POST /auth/change-password` returns `{ user, accessToken, message }` — always call `handleAuthResponse` with the result.
-- `POST /auth/reset-password` returns `{ user, accessToken }` — user is logged in after reset; handle accordingly.
+- `GET /user/me`, `PATCH /user/me` → `{ user }` (always wrapped, never a bare object)
+- `POST /auth/change-password` → `{ user, accessToken, message }`
+- `POST /auth/reset-password` → `{ user, accessToken }` — user is logged in after reset
 
-### Auth state
+---
 
-- Access token: in memory only (never localStorage, never a cookie).
-- User object: in localStorage — rehydrate on app mount via `GET /user/me`.
-- Silent refresh on app mount: if the access token is missing or expired, call `POST /auth/refresh` before rendering protected routes.
+## Auth state
+
+- **Access token** — module-level variable in `lib/axios.ts`. Never localStorage or a cookie. Lost on hard refresh; recovered by silent refresh on mount.
+- **User object** — `localStorage`. Rehydrated on app mount via `GET /user/me`.
+- **Silent refresh** — `AuthContext` calls `POST /auth/refresh` before rendering protected routes. `isLoading` guards against flashing.
+
+---
+
+## Shadcn components
+
+New components: `npx shadcn add <component>` from `client/`. The CLI reads `components.json` and writes to `src/components/ui/`. The `cn()` utility lives in `src/lib/cn.ts` (aliased as `@/lib/cn`).
+
+---
+
+## Formatter
+
+`npm run format` from `client/` — Prettier with `prettier-plugin-tailwindcss` (auto-sorts Tailwind classes). Run before every commit.
+
+---
+
+## Before committing
+
+1. `npm run format`
+2. Update `client/README.md` if pages, env vars, project structure, or commands changed.
