@@ -698,6 +698,10 @@ describe('POST /api/auth/google/exchange', () => {
 				hasPassword: false,
 				createdAt: user.createdAt,
 			},
+			refreshToken: {
+				token: 'test-refresh-token',
+				expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+			},
 		};
 		await redis.setex(`oauth:code:${code}`, 30, JSON.stringify(payload));
 		return payload;
@@ -712,6 +716,18 @@ describe('POST /api/auth/google/exchange', () => {
 		expect(res.status).toBe(200);
 		expect(res.body).toHaveProperty('accessToken', payload.accessToken);
 		expect(res.body.user).toMatchObject({ email: 'google@example.com' });
+	});
+
+	it('sets the refreshToken cookie on successful exchange', async () => {
+		const code = crypto.randomUUID();
+		await seedOAuthCode(code);
+
+		const res = await request(app).post('/api/auth/google/exchange').send({ code });
+
+		expect(res.status).toBe(200);
+		const cookies = res.headers['set-cookie'] as string[] | string;
+		const cookieList = Array.isArray(cookies) ? cookies : [cookies];
+		expect(cookieList.some((c) => c.startsWith('refreshToken='))).toBe(true);
 	});
 
 	it('deletes the Redis key after exchange (one-time use)', async () => {

@@ -97,23 +97,22 @@ export const googleRedirect = (req: Request, res: Response) => {
 
 export const googleCallback = async (req: Request, res: Response) => {
 	const code = req.query.code as string;
-
-	const { refreshToken, oauthCode } = await authService.handleGoogleCallback(code);
-
-	res.cookie('refreshToken', refreshToken.token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
-		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
-	});
-
+	const { oauthCode } = await authService.handleGoogleCallback(code);
 	res.redirect(`${process.env.ORIGIN}/auth/callback?code=${oauthCode}`);
 };
 
 export const exchangeGoogleCode = async (req: Request, res: Response) => {
 	const { code } = req.body;
-	const result = await authService.exchangeGoogleCode(code);
-	res.status(200).json(result);
+	const { accessToken, user, refreshToken } = await authService.exchangeGoogleCode(code);
+
+	res.cookie('refreshToken', refreshToken.token, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: 'strict',
+		maxAge: new Date(refreshToken.expiryDate).getTime() - Date.now(),
+	});
+
+	res.status(200).json({ accessToken, user });
 };
 
 export const changePassword = async (req: Request, res: Response) => {

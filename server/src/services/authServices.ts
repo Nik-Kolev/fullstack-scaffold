@@ -136,16 +136,27 @@ export const handleGoogleCallback = async (code: string) => {
 	await redis.setex(
 		`oauth:code:${oauthCode}`,
 		30,
-		JSON.stringify({ accessToken, user: toSafeUser(user) }),
+		JSON.stringify({
+			accessToken,
+			user: toSafeUser(user),
+			refreshToken: {
+				token: refreshToken.token,
+				expiryDate: refreshToken.expiryDate.toISOString(),
+			},
+		}),
 	);
 
-	return { refreshToken, oauthCode };
+	return { oauthCode };
 };
 
 export const exchangeGoogleCode = async (code: string) => {
 	const raw = await redis.getdel(`oauth:code:${code}`);
 	if (!raw) throw new CustomError(401, 'Invalid or expired OAuth code.');
-	return JSON.parse(raw) as { accessToken: string; user: SafeUser };
+	return JSON.parse(raw) as {
+		accessToken: string;
+		user: SafeUser;
+		refreshToken: { token: string; expiryDate: string };
+	};
 };
 
 export const blacklistToken = async (jti: string, exp: number) => {
