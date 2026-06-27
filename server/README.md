@@ -32,7 +32,10 @@ npm install
 # 2. Copy env file and fill in values
 cp .env.example .env
 
-# 3. Start dev server (auto-starts DB + Redis containers)
+# 3. First-time database setup (wipes + remigrates + seeds)
+npm run db:fresh
+
+# 4. Start dev server (auto-starts DB + Redis containers)
 npm run dev
 
 # Optional: start server + BullMQ worker together

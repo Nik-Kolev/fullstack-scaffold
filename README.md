@@ -49,6 +49,7 @@ fullstack-scaffold/
 cd server
 npm install
 cp .env.example .env   # fill in your API keys — see server/README.md for where to get them
+npm run db:fresh       # first time only — creates schema, runs migrations, seeds test users
 npm run dev            # starts Docker containers, then the server on :8080
 npm run worker         # BullMQ worker (separate terminal) — handles email jobs, token cleanup cron
 # or start both together:
@@ -65,11 +66,13 @@ See [`server/README.md`](server/README.md) and [`client/README.md`](client/READM
 
 ## Seed Data
 
-After starting the server, seed the database:
+`db:fresh` seeds automatically on first setup. To seed without wiping the database:
 
 ```bash
 cd server && npm run db:seed
 ```
+
+Test credentials:
 
 | Email | Password | Role |
 |---|---|---|
