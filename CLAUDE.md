@@ -51,15 +51,15 @@ fullstack-scaffold/
 │   ├── prisma.config.ts     # Prisma 7 — datasource URL goes here, not in schema
 │   └── package.json
 └── client/
-    ├── e2e/                 # Playwright — auth.setup.ts, login.spec.ts, register.spec.ts
+    ├── e2e/                 # Playwright — auth.setup.ts, login.spec.ts, register.spec.ts, forgot-password.spec.ts, reset-password.spec.ts
     ├── playwright.config.ts
     └── src/
         ├── components/      # layout/, shared/, ui/ (shadcn)
         ├── context/         # AuthContext (user + token state)
-        ├── hooks/           # Form hooks — useLoginForm, useRegisterForm …
+        ├── hooks/           # Form hooks by domain — hooks/auth/ (useLoginForm, useRegisterForm, useForgotPasswordForm, useResetPasswordForm)
         ├── i18n/            # react-i18next — en.json + bg.json
         ├── lib/             # axios.ts (interceptors), utils.ts
-        ├── pages/           # Route-level components
+        ├── pages/           # Route-level components by domain — pages/auth/ (LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage)
         ├── services/        # auth.ts, user.ts — axios call functions
         └── types/           # Shared TS types (User, AuthResponse)
 ```
@@ -106,9 +106,7 @@ STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing sec
 
 ## Current State
 
-**Next — `/forgot-password` page**
-Email input form. Calls `forgotPassword()` from `AuthContext` (already wired — calls `POST /auth/forgot-password`). Server always returns 200 regardless of whether the email exists (prevents user enumeration). Show a success message on submit instead of redirecting. Add e2e tests to `e2e/forgot-password.spec.ts`.
-
-After forgot-password: `/reset-password/:token`, then `/dashboard`. See `roadmap.md` → Up Next for full order.
+**Next — `/dashboard` page**
+Authenticated home page. Shows logged-in user info and a feature overview of what's in the scaffold (auth, uploads, payments, sockets). Protected by `ProtectedRoute`. Add e2e tests to `e2e/dashboard.spec.ts`.
 
 Full implementation history, gotchas, and design notes for every completed feature: see `roadmap.md` → `Completed ✓`.

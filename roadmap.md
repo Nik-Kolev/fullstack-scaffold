@@ -11,8 +11,6 @@
 Bootstrap, auth layer, layout layer, and i18n all done. Building pages now.
 
 **Pages to build (stubs exist, need real implementation):**
-- `/forgot-password` — email input, sends reset link
-- `/reset-password/:token` — new password form, reads token from URL
 - `/dashboard` — authenticated home, user info + feature overview
 - `/upload` — file upload demo (R2 integration)
 - `/live` — Socket.io presence demo (open two tabs, see each other online)
@@ -38,6 +36,40 @@ Client Dockerfile:
 ---
 
 ## Completed ✓
+
+### Forgot Password + Reset Password pages + e2e suites
+`/forgot-password` (email input, success state in-place) and `/reset-password` (new password form, reads token from query param). Full Playwright suites: 8 tests for forgot-password, 12 for reset-password.
+
+**Files:**
+- `src/pages/auth/ForgotPasswordPage.tsx` — email form + conditional `submitted` state; no redirect on success; "Back to login" uses `variant="outline"` on form screen, default (dark) on success screen
+- `src/pages/auth/ResetPasswordPage.tsx` — reads token via `useSearchParams().get('token') ?? ''`; shows invalid-token state with "Get a new link" button when token is absent; `newPassword` + `confirmPassword` form when token is present
+- `src/hooks/auth/useForgotPasswordForm.ts` — single email field; returns `submitted: boolean`; calls `forgotPassword()` from AuthContext; sets `submitted = true` on success (no navigate)
+- `src/hooks/auth/useResetPasswordForm.ts` — accepts `token: string`; validates password regex + confirm match; sends `{ token, newPassword }` in POST body; `toast.success(...)` before `navigate('/')`
+- `src/hooks/auth/useLoginForm.ts`, `useRegisterForm.ts` — fixed server error read from `.error` → `.message`; `useRegisterForm` also got password regex check
+- `src/components/layout/AuthHeader.tsx` — added `data-testid="lang-toggle"` for stable e2e i18n selectors
+- `e2e/forgot-password.spec.ts` — 8 tests: required error, invalid email, clears on type, success state, back-to-login, non-existent email still shows success, loading state (mocked), i18n
+- `e2e/reset-password.spec.ts` — 12 tests: no-token state, required errors, password strength, min length, mismatch, clears on type, server error (mocked 401), happy path (mocked 200 + asserts token in POST body), loading state (mocked), i18n
+- `e2e/login.spec.ts`, `e2e/register.spec.ts` — i18n selector updated from `header button` → `[data-testid="lang-toggle"]`
+
+**Folder restructure:**
+- `src/hooks/` → `src/hooks/auth/` for all auth form hooks
+- `src/pages/` → `src/pages/auth/` for all auth pages
+- `src/App.tsx` imports updated accordingly; route fixed from `/reset-password/:token` → `/reset-password`
+
+**Gotchas:**
+- Reset token travels as **URL query param** (`?token=`), not a path param — route must be `/reset-password`, page reads via `useSearchParams()`. The stub had `:token` which was wrong.
+- Server error shape is `{ message, details? }` — all hooks must read `err.response?.data?.message`, not `.error`. All 4 auth hooks were reading `.error` and showing nothing on server errors.
+- Password regex `/^(?=.*[a-zA-Z])(?=.*\d).{8,}$/` **must match the server Zod schema exactly** — client was length-only; server rejected passwords without both a letter and a number with "400 Validation failed". Added regex to `useResetPasswordForm` and `useRegisterForm`.
+- `useForgotPasswordForm` returns `submitted: boolean` (not `navigate`) — prevents user enumeration: the same "check your inbox" screen appears regardless of whether the email exists.
+
+**Design decisions:**
+- No redirect on forgot-password success — the success state renders in place. Avoids timing-based user enumeration.
+- After successful password reset: `navigate('/')` (home), not `/dashboard` — dashboard may not exist in all projects built on this scaffold.
+- Reset token in URL is standard practice — it is one-time, hashed in DB, 15-min expiry. No security concern compared to OAuth codes (which carry active grants).
+- Multi-tab behaviour: after reset, all refresh tokens are invalidated server-side. Other open tabs continue working until their access token expires (~15 min), then silent refresh fails → auto-logout. No client code needed.
+- `data-testid="lang-toggle"` on `AuthHeader`'s language button — stable selector for i18n tests across all auth pages.
+
+---
 
 ### Register page + e2e suite
 Name/email/password/confirm-password form, Google OAuth, GuestRoute guard, full Playwright suite.
