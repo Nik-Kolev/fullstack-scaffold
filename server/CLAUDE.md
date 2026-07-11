@@ -28,6 +28,7 @@ npm run test              # vitest run (single pass)
 npm run test:watch        # vitest (watch mode)
 
 # Code
+npm run lint              # eslint .
 npm run format            # prettier --write src/**/*.ts
 ```
 
@@ -36,10 +37,12 @@ npm run format            # prettier --write src/**/*.ts
 ## Conventions
 
 ### Imports
+
 - Always `.js` extension on local imports (ESM + nodenext resolution).
 - Named exports preferred; default export only for singleton instances (prisma, router).
 
 ### Error handling
+
 - **No try/catch in controllers or services.** Express 5 auto-catches async errors. (Express 4 does not — every async handler would need explicit try/catch or `express-async-errors`.)
 - Throw `CustomError(statusCode, message, details?)` for operational errors.
 - `errorHandler` middleware maps: CustomError → its fields, Prisma known errors → PRISMA_ERROR_MAP, PrismaClientValidationError → 400, generic Error → 500.
@@ -48,11 +51,19 @@ npm run format            # prettier --write src/**/*.ts
 - Exception: use try/catch in a controller to swallow errors for non-critical side effects that must not abort a successful response (e.g., Redis blacklist after password change) — add a comment explaining why.
 
 ### Validation
+
 - Validate at the route level via `validateBody(schema)` middleware.
 - `validateBody` throws `CustomError(400)` and strips unknown fields via `result.data`.
 - `errorHandler` stays Zod-free — errors arrive as `CustomError`.
 
+### Linting
+
+- `eslint.config.js` — flat config, mirrors `client/eslint.config.js` (`@eslint/js` + `typescript-eslint` + `globals`), swapped to `globals.node` with no React plugins.
+- Params required by a framework signature but unused in the body (Express error middleware's 4th param, a BullMQ job processor's `job` arg) are prefixed `_` and covered by `argsIgnorePattern: '^_'` / `caughtErrorsIgnorePattern: '^_'` on `no-unused-vars` — this is a pre-existing codebase convention, not a lint workaround.
+- `**/*.test.ts` has `no-explicit-any` turned off — test mocks casting partial third-party SDK responses (e.g. Stripe) past their full type are expected there; production code stays strict.
+
 ### Auth tokens
+
 - Access token: short-lived (15 min), returned as JSON body field `accessToken`.
 - Refresh token: long-lived (7 d), set as `httpOnly; sameSite=strict; secure` cookie named `refreshToken`.
 - `secure` cookie flag is gated on `NODE_ENV === 'production'` — must be set on deploy.

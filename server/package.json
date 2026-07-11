@@ -21,6 +21,7 @@
 		"db:studio": "prisma studio",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"lint": "eslint .",
 		"format": "prettier --write \"src/**/*.ts\""
 	},
 	"prisma": {
@@ -51,6 +52,7 @@
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
+		"@eslint/js": "^10.0.1",
 		"@types/bcrypt": "^6.0.0",
 		"@types/cookie-parser": "^1.4.10",
 		"@types/cors": "^2.8.19",
@@ -63,12 +65,15 @@
 		"concurrently": "^10.0.3",
 		"dotenv": "^17.4.2",
 		"dotenv-cli": "^11.0.0",
+		"eslint": "^10.5.0",
+		"globals": "^17.6.0",
 		"kill-port": "^2.0.1",
 		"nodemon": "^3.1.14",
 		"prettier": "^3.8.3",
 		"prisma": "^7.8.0",
 		"socket.io-client": "^4.8.3",
 		"tsx": "^4.22.3",
-		"typescript": "^6.0.3"
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.61.0"
 	}
 }

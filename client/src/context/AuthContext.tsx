@@ -136,7 +136,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    let pollId: ReturnType<typeof setInterval>
+    const pollId = setInterval(() => {
+      if (popup.closed) cleanup()
+    }, 500)
 
     const cleanup = () => {
       window.removeEventListener('message', handler)
@@ -155,9 +157,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     window.addEventListener('message', handler)
-    pollId = setInterval(() => {
-      if (popup.closed) cleanup()
-    }, 500)
   }
 
   return (

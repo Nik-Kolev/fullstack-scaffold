@@ -14,16 +14,16 @@ export function PasswordChanged({ name, loginUrl }: PasswordChangedProps) {
 					<Hr style={divider} />
 					<Text style={paragraph}>Hi {name},</Text>
 					<Text style={paragraph}>
-						The password for your account was recently changed. If this was you,
-						no further action is needed.
+						The password for your account was recently changed. If this was you, no
+						further action is needed.
 					</Text>
 					<Button style={button} href={loginUrl}>
 						Go to your account
 					</Button>
 					<Hr style={divider} />
 					<Text style={footer}>
-						If you didn&apos;t make this change, contact support immediately —
-						your account may have been compromised.
+						If you didn&apos;t make this change, contact support immediately — your
+						account may have been compromised.
 					</Text>
 				</Container>
 			</Body>

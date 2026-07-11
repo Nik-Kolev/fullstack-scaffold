@@ -25,7 +25,10 @@ const MULTER_ERROR_MAP: Record<string, { statusCode: number; message: string }> 
 function extractPrismaMeta(meta: unknown): unknown {
 	if (!meta || typeof meta !== 'object') return undefined;
 	const m = meta as Record<string, unknown>;
-	const fields = (m.driverAdapterError as any)?.cause?.constraint?.fields ?? m.target;
+	const driverAdapterError = m.driverAdapterError as
+		| { cause?: { constraint?: { fields?: unknown } } }
+		| undefined;
+	const fields = driverAdapterError?.cause?.constraint?.fields ?? m.target;
 	return fields ? { fields } : undefined;
 }
 
