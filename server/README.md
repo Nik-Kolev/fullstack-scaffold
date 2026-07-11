@@ -54,7 +54,7 @@ npm run dev:all
 | `JWT_ACCESS_SECRET`  | Secret for signing access tokens (15 min) — any random string  |
 | `JWT_REFRESH_SECRET` | Secret for signing refresh tokens (7 d) — any random string    |
 | `NODE_ENV`           | Set to `production` on deploy — gates the `secure` cookie flag |
-| `REDIS_URL`          | Redis connection string (`redis://localhost:6379` in dev)       |
+| `REDIS_URL`          | Redis connection string (`redis://localhost:6379` in dev)      |
 
 `DATABASE_URL` format: `postgresql://USER:PASSWORD@localhost:5432/DBNAME`  
 Must match the credentials in the root `docker-compose.yml`.
@@ -64,10 +64,10 @@ Must match the credentials in the root `docker-compose.yml`.
 > Get credentials at [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials → Create OAuth 2.0 Client ID.  
 > Add `GOOGLE_REDIRECT_URI` to the **Authorized redirect URIs** list in that same screen.
 
-| Variable               | Description                                       |
-| ---------------------- | ------------------------------------------------- |
-| `GOOGLE_CLIENT_ID`     | OAuth client ID                                   |
-| `GOOGLE_CLIENT_SECRET` | OAuth client secret                               |
+| Variable               | Description                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`     | OAuth client ID                                                                                      |
+| `GOOGLE_CLIENT_SECRET` | OAuth client secret                                                                                  |
 | `GOOGLE_REDIRECT_URI`  | Must match an authorized redirect URI in GCP — e.g. `http://localhost:8080/api/auth/google/callback` |
 
 ### Resend (email)
@@ -75,11 +75,11 @@ Must match the credentials in the root `docker-compose.yml`.
 > Get your API key at [resend.com](https://resend.com) → API Keys.  
 > In dev you can use `onboarding@resend.dev` as `RESEND_FROM` without verifying a domain.
 
-| Variable        | Description                                                   |
-| --------------- | ------------------------------------------------------------- |
-| `RESEND_API_KEY`| Resend API key                                                |
-| `RESEND_FROM`   | Sender address (e.g. `onboarding@resend.dev` in dev)          |
-| `RESEND_REPLY_TO` | Address where user replies land (e.g. your own inbox)       |
+| Variable          | Description                                           |
+| ----------------- | ----------------------------------------------------- |
+| `RESEND_API_KEY`  | Resend API key                                        |
+| `RESEND_FROM`     | Sender address (e.g. `onboarding@resend.dev` in dev)  |
+| `RESEND_REPLY_TO` | Address where user replies land (e.g. your own inbox) |
 
 ### Cloudflare R2 (file storage)
 
@@ -87,14 +87,14 @@ Must match the credentials in the root `docker-compose.yml`.
 > Enable **Public Access** on the bucket to get a `R2_PUBLIC_URL`.  
 > Generate R2 API keys under R2 → Manage R2 API Tokens.
 
-| Variable              | Description                                                            |
-| --------------------- | ---------------------------------------------------------------------- |
-| `R2_ACCOUNT_ID`       | Cloudflare account ID (from the R2 overview page)                      |
-| `R2_ACCESS_KEY_ID`    | R2 API token access key ID                                             |
-| `R2_SECRET_ACCESS_KEY`| R2 API token secret access key                                         |
-| `R2_BUCKET_NAME`      | Bucket name                                                            |
-| `R2_PUBLIC_URL`       | Public base URL for the bucket (e.g. `https://pub-xxx.r2.dev`)         |
-| `R2_ENDPOINT`         | R2 S3 API endpoint — EU: `https://<accountid>.eu.r2.cloudflarestorage.com` |
+| Variable               | Description                                                                |
+| ---------------------- | -------------------------------------------------------------------------- |
+| `R2_ACCOUNT_ID`        | Cloudflare account ID (from the R2 overview page)                          |
+| `R2_ACCESS_KEY_ID`     | R2 API token access key ID                                                 |
+| `R2_SECRET_ACCESS_KEY` | R2 API token secret access key                                             |
+| `R2_BUCKET_NAME`       | Bucket name                                                                |
+| `R2_PUBLIC_URL`        | Public base URL for the bucket (e.g. `https://pub-xxx.r2.dev`)             |
+| `R2_ENDPOINT`          | R2 S3 API endpoint — EU: `https://<accountid>.eu.r2.cloudflarestorage.com` |
 
 ### Stripe (payments)
 
@@ -102,10 +102,10 @@ Must match the credentials in the root `docker-compose.yml`.
 > Get the webhook secret at Developers → Webhooks → your endpoint → Signing secret.  
 > In dev, use the Stripe CLI: `stripe listen --forward-to localhost:8080/api/payment/webhook`.
 
-| Variable               | Description                       |
-| ---------------------- | --------------------------------- |
-| `STRIPE_SECRET_KEY`    | Secret key (`sk_test_...` in dev) |
-| `STRIPE_WEBHOOK_SECRET`| Webhook signing secret            |
+| Variable                | Description                       |
+| ----------------------- | --------------------------------- |
+| `STRIPE_SECRET_KEY`     | Secret key (`sk_test_...` in dev) |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signing secret            |
 
 ## Project Structure
 
@@ -135,55 +135,58 @@ prisma/
 
 ## API Endpoints
 
-| Method & Path                  | Auth     | Description                                                      |
-| ------------------------------ | -------- | ----------------------------------------------------------------- |
-| `POST /auth/register`          | —        | Create account, send welcome email                                |
-| `POST /auth/login`             | —        | Issue access + refresh tokens                                     |
-| `POST /auth/logout`            | —        | Revoke refresh token, clear cookie                                |
-| `POST /auth/refresh`           | cookie   | Rotate refresh token, issue new access token                      |
-| `GET /auth/google`             | —        | Start Google OAuth flow                                           |
-| `GET /auth/google/callback`    | —        | Google OAuth callback, upsert by `googleId`                       |
-| `POST /auth/change-password`   | required | Change password; invalidates other sessions                       |
-| `POST /auth/forgot-password`   | —        | Always 200; emails a reset link if user exists                    |
-| `POST /auth/reset-password`    | —        | Reset password via emailed token                                  |
-| `GET /user/me`                 | required | Fetch the authenticated user's profile                            |
-| `PATCH /user/me`               | required | Update own name or email                                          |
-| `GET /user/:id`                | —        | Fetch a user by ID                                                |
-| `POST /upload`                 | required | Upload up to 10 files to a folder                                 |
-| `DELETE /upload/:key`          | required | Delete a file (`key` must be URL-encoded)                         |
-| `GET /upload/folder/:name`     | required | List all files in a named folder                                  |
-| `GET /upload/folders`          | required | List all distinct folder names for the user                       |
-| `POST /payment/checkout`       | required | Create Stripe Checkout session; body `{ productId, quantity }`, returns `{ url }` |
-| `POST /payment/webhook`        | —        | Stripe webhook — updates payment status on checkout/charge events |
-| `GET /product`                 | —        | List active products; supports `?page=&limit=` (defaults 1/10)   |
-| `GET /product/:id`             | —        | Get a single product by ID (includes inactive)                    |
-| `POST /product`                | admin    | Create a product; multipart `{ name, price, description? }` + optional `image` |
-| `PUT /product/:id`             | admin    | Update a product (partial — at least one field required)          |
-| `DELETE /product/:id`          | admin    | Soft-delete a product (`isActive = false`), deletes R2 image      |
-| `POST /product/:id/image`      | admin    | Replace product image; deletes old R2 object first                |
-| `DELETE /product/:id/image`    | admin    | Remove product image without deactivating                         |
+| Method & Path                | Auth     | Description                                                                       |
+| ---------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `POST /auth/register`        | —        | Create account, send welcome email                                                |
+| `POST /auth/login`           | —        | Issue access + refresh tokens                                                     |
+| `POST /auth/logout`          | —        | Revoke refresh token, clear cookie                                                |
+| `POST /auth/refresh`         | cookie   | Rotate refresh token, issue new access token                                      |
+| `GET /auth/google`           | —        | Start Google OAuth flow                                                           |
+| `GET /auth/google/callback`  | —        | Google OAuth callback, upsert by `googleId`                                       |
+| `POST /auth/change-password` | required | Change password; invalidates other sessions                                       |
+| `POST /auth/forgot-password` | —        | Always 200; emails a reset link if user exists                                    |
+| `POST /auth/reset-password`  | —        | Reset password via emailed token                                                  |
+| `GET /user/me`               | required | Fetch the authenticated user's profile                                            |
+| `PATCH /user/me`             | required | Update own name or email                                                          |
+| `GET /user/:id`              | —        | Fetch a user by ID                                                                |
+| `POST /upload`               | required | Upload up to 10 files to a folder                                                 |
+| `DELETE /upload/:key`        | required | Delete a file (`key` must be URL-encoded)                                         |
+| `GET /upload/folder/:name`   | required | List all files in a named folder                                                  |
+| `GET /upload/folders`        | required | List all distinct folder names for the user                                       |
+| `POST /payment/checkout`     | required | Create Stripe Checkout session; body `{ productId, quantity }`, returns `{ url }` |
+| `POST /payment/webhook`      | —        | Stripe webhook — updates payment status on checkout/charge events                 |
+| `GET /product`               | —        | List active products; supports `?page=&limit=` (defaults 1/10)                    |
+| `GET /product/:id`           | —        | Get a single product by ID (includes inactive)                                    |
+| `POST /product`              | admin    | Create a product; multipart `{ name, price, description? }` + optional `image`    |
+| `PUT /product/:id`           | admin    | Update a product (partial — at least one field required)                          |
+| `DELETE /product/:id`        | admin    | Soft-delete a product (`isActive = false`), deletes R2 image                      |
+| `POST /product/:id/image`    | admin    | Replace product image; deletes old R2 object first                                |
+| `DELETE /product/:id/image`  | admin    | Remove product image without deactivating                                         |
 
 ## Frontend Integration Notes
 
 Key contracts to know when writing frontend service calls:
 
 ### Auth
+
 - `GET /user/me` → `{ user }` — includes `hasPassword: boolean` (computed). Use this, not `googleId`, to decide whether to show the current-password field on the change-password form. A Google user who has since set a password will have both `googleId` set and `hasPassword: true`.
 - `POST /auth/change-password` → `{ user, accessToken, message }` — replace the stored access token and cached user object on success. All other sessions are invalidated server-side.
 - `POST /auth/reset-password` → `{ user, accessToken }` — user is logged in immediately after reset.
 
 ### Payments
+
 - `POST /payment/checkout` → `{ url }` — redirect to `url` immediately (Stripe-hosted checkout). Send `{ productId, quantity }`, never a raw price.
 - `payment.amountTotal` is stored and returned in **cents** (integer). Format for display: `new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amountTotal / 100)`.
 - After payment, wait for the DB to reflect `SUCCEEDED` (set by webhook) before showing a confirmation screen — don't trust the Stripe redirect query param alone.
 
 ### File uploads
+
 - `DELETE /upload/:key` — always `encodeURIComponent(key)` when building the URL. Keys contain `/` (e.g. `42/images/<uuid>.png`); without encoding Express splits them across route segments and 404s.
-  ```ts
-  fetch(`/api/upload/${encodeURIComponent(key)}`, { method: 'DELETE' })
-  ```
+    ```ts
+    fetch(`/api/upload/${encodeURIComponent(key)}`, { method: 'DELETE' });
+    ```
 - Successful delete returns `204 No Content` — drop the file from local state, don't parse a body.
-- 404 on delete means the key is missing *or* belongs to another user — both cases return the same response on purpose.
+- 404 on delete means the key is missing _or_ belongs to another user — both cases return the same response on purpose.
 
 ---
 
@@ -192,8 +195,8 @@ Key contracts to know when writing frontend service calls:
 Every authenticated socket connection is auto-joined to a personal room (`user:${userId}`). To push a server-initiated event from any service:
 
 ```ts
-import { io } from '../lib/socket/socket.js'
-io.to(`user:${userId}`).emit('event-name', payload)
+import { io } from '../lib/socket/socket.js';
+io.to(`user:${userId}`).emit('event-name', payload);
 ```
 
 - Add role/feature rooms in `lib/socket/room.ts`.
@@ -223,28 +226,28 @@ Any test that exercises a service which enqueues a job needs `vi.mock('../lib/bu
 
 ### Dev
 
-| Command          | Description                                           |
-| ---------------- | ----------------------------------------------------- |
-| `npm run dev`    | Start HTTP server with hot reload (auto-starts Docker) |
-| `npm run worker` | Start BullMQ worker process with hot reload            |
-| `npm run dev:all`| Start HTTP server + worker together (colour-coded)    |
+| Command           | Description                                            |
+| ----------------- | ------------------------------------------------------ |
+| `npm run dev`     | Start HTTP server with hot reload (auto-starts Docker) |
+| `npm run worker`  | Start BullMQ worker process with hot reload            |
+| `npm run dev:all` | Start HTTP server + worker together (colour-coded)     |
 
 ### Docker
 
-| Command               | Description                     |
-| --------------------- | ------------------------------- |
+| Command               | Description                         |
+| --------------------- | ----------------------------------- |
 | `npm run docker:up`   | Start PostgreSQL + Redis containers |
-| `npm run docker:stop` | Stop containers (data preserved)|
+| `npm run docker:stop` | Stop containers (data preserved)    |
 
 ### Database
 
-| Command                               | Description                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------- |
-| `npm run db:migrate -- --name <name>` | Create and apply a new migration (dev DB), then deploy to the test DB     |
-| `npm run db:reset`                    | Drop and re-apply all existing migrations (dev DB only)                   |
-| `npm run db:fresh`                    | Wipe migration history, reset dev + test DBs, then seed                   |
-| `npm run db:seed`                     | Seed the database with dev users and default products (idempotent)        |
-| `npm run db:studio`                   | Open Prisma Studio (browser DB viewer)                                    |
+| Command                               | Description                                                           |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| `npm run db:migrate -- --name <name>` | Create and apply a new migration (dev DB), then deploy to the test DB |
+| `npm run db:reset`                    | Drop and re-apply all existing migrations (dev DB only)               |
+| `npm run db:fresh`                    | Wipe migration history, reset dev + test DBs, then seed               |
+| `npm run db:seed`                     | Seed the database with dev users and default products (idempotent)    |
+| `npm run db:studio`                   | Open Prisma Studio (browser DB viewer)                                |
 
 > `db:migrate` and `db:fresh` both keep the `scaffold_test` DB in sync automatically.
 
@@ -265,10 +268,10 @@ Any test that exercises a service which enqueues a job needs `vi.mock('../lib/bu
 
 Run `npm run db:seed` (or it runs automatically after `db:fresh`) to populate the database:
 
-| Email           | Password   | Role    |
-| --------------- | ---------- | ------- |
-| `test@abv.bg`   | `password` | `user`  |
-| `admin@abv.bg`  | `password` | `admin` |
+| Email          | Password   | Role    |
+| -------------- | ---------- | ------- |
+| `test@abv.bg`  | `password` | `user`  |
+| `admin@abv.bg` | `password` | `admin` |
 
 The seed is idempotent — safe to run multiple times. It also seeds two products (`Basic Plan` at €9.99 and `Pro Plan` at €29.99) if no products exist yet.
 
@@ -298,10 +301,10 @@ Tests clear relevant tables in `beforeEach` — no manual cleanup needed. `vites
 
 `.env.test` is gitignored — copy `.env` and adjust. The following are required even for non-payment tests:
 
-| Variable               | Test value      | Why                                                          |
-| ---------------------- | --------------- | ------------------------------------------------------------ |
-| `STRIPE_SECRET_KEY`    | `sk_test_dummy` | `stripe.ts` initialises at module load — all files that import `app` need this set |
-| `STRIPE_WEBHOOK_SECRET`| `whsec_dummy`   | Same reason — referenced in `paymentController.ts`           |
+| Variable                | Test value      | Why                                                                                |
+| ----------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`     | `sk_test_dummy` | `stripe.ts` initialises at module load — all files that import `app` need this set |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_dummy`   | Same reason — referenced in `paymentController.ts`                                 |
 
 Payment tests mock the Stripe SDK entirely — no real API calls are made.
 
