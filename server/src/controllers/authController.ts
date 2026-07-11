@@ -48,7 +48,7 @@ export const logoutUser = async (req: Request, res: Response) => {
 		try {
 			const payload = JWT.verifyToken('access', accessToken);
 			await authService.blacklistToken(payload.jti!, payload.exp!);
-		} catch (err) {
+		} catch {
 			// token is expired - nothing to blacklist
 		}
 	}
