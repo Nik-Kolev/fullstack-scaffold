@@ -3,6 +3,7 @@ import type { Application } from 'express';
 import cors from 'cors';
 import type { CorsOptions } from 'cors';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { generalLimiter } from '../middleware/rateLimiter.js';
 
 const origin: string = process.env.ORIGIN;
@@ -15,6 +16,16 @@ const corsOptions: CorsOptions = {
 };
 
 export default function expressConfig(app: Application) {
+	app.use(
+		helmet({
+			contentSecurityPolicy: {
+				directives: {
+					// Safari upgrades http://localhost to https://localhost otherwise, breaking local dev.
+					'upgrade-insecure-requests': process.env.NODE_ENV === 'production' ? [] : null,
+				},
+			},
+		}),
+	);
 	app.use(generalLimiter);
 	app.use(express.json());
 	app.use(express.urlencoded({ extended: true }));

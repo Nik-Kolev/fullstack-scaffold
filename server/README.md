@@ -17,6 +17,7 @@ Express + TypeScript REST API with Prisma ORM and PostgreSQL.
 - **Storage:** Cloudflare R2 (S3-compatible)
 - **Realtime:** Socket.io
 - **Payments:** Stripe (one-time Checkout sessions)
+- **Security headers:** Helmet (CSP, HSTS, X-Frame-Options, etc.)
 
 ## Prerequisites
 
@@ -114,7 +115,7 @@ src/
   app.ts            App factory — middleware, routes, error handler (no listen)
   index.ts          Entry point — imports app, creates http.Server, calls initSocket(server)
   worker.ts         Worker process entry point — DB connect + graceful shutdown for BullMQ workers
-  config/           Express middleware setup (cors, json, cookieParser, rate limiter)
+  config/           Express middleware setup (helmet, cors, json, cookieParser, rate limiter)
   routes/           Route definitions — maps URLs to controllers
   controllers/      Thin handlers — call service, set cookie, send response
   services/         All DB and business logic
@@ -326,6 +327,6 @@ Wipes migration history, drops and recreates both the dev and test DBs, creates 
 
 ## Deployment Notes
 
-- Set `NODE_ENV=production` — gates the `secure` flag on the refresh token cookie (required for HTTPS)
+- Set `NODE_ENV=production` — gates the `secure` flag on the refresh token cookie (required for HTTPS) and the CSP `upgrade-insecure-requests` directive (force-redirects `http://` → `https://`, which breaks local dev)
 - Replace `DATABASE_URL` with your managed database connection string
 - `docker-compose.yml` is for local dev only — do not use in production
