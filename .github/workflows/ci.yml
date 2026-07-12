@@ -80,3 +80,9 @@ jobs:
           EOF
       - run: npx dotenv -e .env.test -- prisma migrate deploy
       - run: npm run test
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose build server worker client

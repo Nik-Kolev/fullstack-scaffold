@@ -42,7 +42,42 @@ fullstack-scaffold/
 
 ## Getting Started
 
-**Prerequisites:** Node.js 20+, Docker Desktop running.
+### Option A: Docker (recommended)
+
+Runs the entire stack — client, server, worker, Postgres, and Redis — in containers. No local Node, Postgres, or Redis install needed.
+
+**Prerequisites:** Docker Desktop running.
+
+```bash
+git clone <repo-url>
+cd fullstack-scaffold
+cp .env.example .env               # already has working local defaults — no editing needed
+cp server/.env.example server/.env # already has working local defaults for the core app;
+                                    # optional services (Stripe, R2, etc.) stay blank until you need them
+docker compose up --build
+```
+
+That's it — the server container applies pending migrations and seeds the test users/sample products automatically on startup (both are safe to re-run, so this stays true on every `docker compose up`, not just the first). `client/.env` isn't needed for the Docker path — the client's API URL is baked in at build time via `docker-compose.yml`, not read from that file.
+
+The client is now running at http://localhost:5173, the API at http://localhost:8080. `docker compose down` stops everything; add `-v` to also wipe the database volumes.
+
+**Using an external database or Redis instance instead of the bundled containers?** Set `DATABASE_URL`/`REDIS_URL` in the root `.env` — they override the bundled `postgres`/`redis` containers' URLs when present.
+
+**Need a real admin user** (e.g. for a production deploy, where seeding known test credentials isn't appropriate)?
+
+```bash
+docker compose exec -e ADMIN_EMAIL=you@example.com -e ADMIN_PASSWORD=<a real password> -e ADMIN_NAME="Your Name" server npm run create-admin
+```
+
+Safe to re-run — upserts by email, so it also works to promote an already-registered user to admin.
+
+Every service reads its config entirely from environment variables (`DATABASE_URL`, `REDIS_URL`, etc.) — nothing is wired to `localhost` inside the images themselves. That means the same Dockerfiles and `docker-compose.yml` are a real starting point for deploying to any container host later (a Droplet, DigitalOcean App Platform, etc.), not just a local dev convenience.
+
+### Option B: Local Node (hot-reload dev)
+
+The Docker build is a static, production-style build with no hot reload. For active development, running natively with `tsx`/`vite` gives instant reload on save.
+
+**Prerequisites:** Node.js 20+, Docker Desktop running (for Postgres/Redis containers only).
 
 ```bash
 # Server

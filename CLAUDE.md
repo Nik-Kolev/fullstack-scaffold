@@ -49,10 +49,14 @@ fullstack-scaffold/
 │   │   └── index.ts         # entry: create app, mount routes, attach errorHandler last
 │   ├── scripts/             # db-fresh.mjs
 │   ├── prisma.config.ts     # Prisma 7 — datasource URL goes here, not in schema
+│   ├── Dockerfile           # multi-stage; runtime image shared by server + worker (compose command: override)
+│   ├── docker-entrypoint.sh # runs `prisma migrate deploy` before exec'ing the CMD
 │   └── package.json
 └── client/
     ├── e2e/                 # Playwright — auth.setup.ts, login.spec.ts, register.spec.ts, forgot-password.spec.ts, reset-password.spec.ts
     ├── playwright.config.ts
+    ├── Dockerfile           # multi-stage; ARG VITE_API_URL baked in at build time (Vite inlines env at build, not runtime)
+    ├── nginx.conf           # SPA fallback + reverse-proxies /api and /socket.io to the server service
     └── src/
         ├── components/      # layout/, shared/, ui/ (shadcn)
         ├── context/         # AuthContext (user + token state)
@@ -65,6 +69,16 @@ fullstack-scaffold/
 ```
 
 ---
+
+## Env Vars (root `.env`)
+
+```
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+POSTGRES_DB=
+```
+
+Used by `docker-compose.yml` — both to initialize the `postgres` container and, via variable substitution, to build the `DATABASE_URL` that the `server`/`worker` containers actually connect with (their own `server/.env`'s `DATABASE_URL` points at `localhost`, which is correct for local dev but not reachable from inside a sibling container — see `docker-compose.yml`'s `server`/`worker` `environment:` overrides).
 
 ## Env Vars (`server/.env`)
 
@@ -106,5 +120,6 @@ STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing sec
 
 ## Current State
 
-**Next — Full Docker setup**
-Add `server/Dockerfile` (multi-stage build), `client/Dockerfile` (multi-stage + nginx), update root `docker-compose.yml` to add `server` and `client` services with env vars and named volumes. Goal: `docker compose up` starts the entire stack for a new developer with no local Node/Postgres/Redis required.
+**Full Docker setup — done.** `docker compose up --build` starts the entire stack (client, server, worker, Postgres, Redis) with no local Node/Postgres/Redis install required, using `.env.example` files that already have working local defaults — no editing needed for the core app to boot. `server/Dockerfile` is a multi-stage build shared by both the `server` and `worker` compose services (`command:` override selects the entrypoint); its `docker-entrypoint.sh` runs `prisma migrate deploy` and (outside `NODE_ENV=production`) `prisma db seed` automatically before starting — both are safe to re-run on every boot, not just the first. `client/Dockerfile` builds a static Vite bundle (`ARG VITE_API_URL=/api`, relative/same-origin since nginx now fronts the whole app) served by nginx, which reverse-proxies `/api` and `/socket.io` to the `server` service using a dynamic-DNS resolver pattern (`resolver 127.0.0.11` + a variable in `proxy_pass`) so it survives the `server` container being recreated without needing its own restart. `server`/`worker`'s `DATABASE_URL`/`REDIS_URL` default to the bundled `postgres`/`redis` containers but can be overridden by setting either in the root `.env` — points the stack at an external database/Redis instance instead, no code change needed. All compose resources (containers, images, volumes, network) share a consistent `scaffold` project name/prefix (explicit `name: scaffold` at the top of `docker-compose.yml`). CI's `.github/workflows/ci.yml` gained a `docker` job that builds all three images so a broken Dockerfile fails the build.
+
+**Next — reviewer pass** over the combined CI + security-hardening + full-Docker diff, per the standing plan.
