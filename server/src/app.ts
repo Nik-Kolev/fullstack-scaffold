@@ -16,6 +16,12 @@ const app: Application = express();
 
 app.use('/public', express.static(path.join(__dirname, './public')));
 
+// Registered ahead of expressConfig deliberately — a container healthcheck
+// shouldn't depend on CORS/rate-limiting/helmet being in the picture.
+app.get('/health', (_req, res) => {
+	res.status(200).json({ status: 'ok' });
+});
+
 // Must be registered before expressConfig applies express.json() — Stripe signature
 // verification requires the raw request buffer, not a parsed JS object.
 app.post(

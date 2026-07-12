@@ -41,15 +41,21 @@ services:
     restart: unless-stopped
     env_file: ./server/.env
     environment:
-      # server/.env points these at localhost for non-Docker dev — inside compose's
-      # network, "localhost" would mean the server container itself, so these two
-      # override env_file, defaulting to the bundled postgres/redis containers.
-      # Set DATABASE_URL / REDIS_URL in the root .env to point at an external
-      # database or Redis instance instead — that takes priority over the default.
+      # server/.env uses localhost for non-Docker dev; override to reach the
+      # sibling containers by service name. Set DATABASE_URL/REDIS_URL in root
+      # .env to point at an external DB/Redis instead — takes priority.
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
     ports:
-      - '8080:8080'
+      # Loopback-only — nginx reaches server via Docker's internal network
+      # regardless; this just keeps the host port off the LAN/internet.
+      - '127.0.0.1:8080:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:8080/health']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s # migrate deploy + db seed run before the app starts listening
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,7 +88,8 @@ services:
     ports:
       - '5173:80'
     depends_on:
-      - server
+      server:
+        condition: service_healthy
 
 volumes:
   postgres_data:

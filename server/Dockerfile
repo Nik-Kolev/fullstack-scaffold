@@ -22,14 +22,10 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/dist ./dist
-# prisma generate outputs runtime .js/.wasm files (no .ts source), so tsc never
-# emits them into dist/ on its own — copy the generated client over explicitly.
+# tsc doesn't copy non-.ts files — the generated Prisma client is plain .js/.wasm.
 COPY --from=build /app/src/generated/prisma ./dist/generated/prisma
-# `prisma db seed` runs `tsx prisma/seed.ts` against the TS source tree, not
-# dist/ — seed.ts imports ../src/lib/prisma.js, so src/ has to exist here too.
+# seed.ts and create-admin.ts run via tsx against source, not dist/.
 COPY --from=build /app/src ./src
-# scripts/create-admin.ts is run manually post-deploy (docker compose exec),
-# same tsx-against-source situation as seed.ts above.
 COPY --from=build /app/scripts ./scripts
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
