@@ -43,5 +43,5 @@
 		// JSX — for React Email templates
 		"jsx": "react-jsx"
 	},
-	"exclude": ["node_modules", "prisma.config.ts", "prisma", "vitest.config.ts"]
+	"exclude": ["node_modules", "prisma.config.ts", "prisma", "vitest.config.ts", "scripts"]
 }

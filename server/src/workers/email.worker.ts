@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { createWorker } from '../lib/bullmq.js';
-import { WelcomeEmail } from '../emails/welcome.jsx';
+import { WelcomeEmail } from '../emails/welcome.js';
 import { PasswordReset } from '../emails/passwordReset.js';
 import { sendEmail } from '../lib/resend.js';
 import { render } from '@react-email/render';
