@@ -54,8 +54,10 @@ cd fullstack-scaffold
 cp .env.example .env               # already has working local defaults — no editing needed
 cp server/.env.example server/.env # already has working local defaults for the core app;
                                     # optional services (Stripe, R2, etc.) stay blank until you need them
-docker compose up --build
+docker compose up --build -d
 ```
+
+`-d` runs everything in the background and hands your terminal back once containers are up.
 
 That's it — the server container applies pending migrations and seeds the test users/sample products automatically on startup (both are safe to re-run, so this stays true on every `docker compose up`, not just the first). `client/.env` isn't needed for the Docker path — the client's API URL is baked in at build time via `docker-compose.yml`, not read from that file.
 
