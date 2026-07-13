@@ -13,7 +13,7 @@ See `server/README.md → Frontend Integration Notes` for response shapes and AP
 - `context/` — consumes services, owns state, exposes it via hooks.
 - `components/` and `pages/` — consume context via hooks. Never call a service directly from a component.
 
-Form state and submit logic live in `hooks/` and are used inside components — not in context.
+Form state and submit logic live in `hooks/` and are used inside components — not in context. Validation uses **React Hook Form + Zod**: each hook builds its schema via a factory function in `schemas/` (e.g. `buildLoginSchema(t)`), never a static exported schema — client error messages must go through `useTranslation()`'s `t()`, unlike the server's static Zod schemas which hardcode English messages since API responses aren't localized.
 
 **CSS prefix per component.** Pick an abbreviation from the component name (e.g. `UserProfileCard → upc-`). Prevents class name collisions without CSS modules.
 

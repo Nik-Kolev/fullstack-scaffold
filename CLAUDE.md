@@ -64,6 +64,7 @@ fullstack-scaffold/
         ├── i18n/            # react-i18next — en.json + bg.json
         ├── lib/             # axios.ts (interceptors), cn.ts (shadcn utility)
         ├── pages/           # Route-level components by domain — pages/auth/ (LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage)
+        ├── schemas/         # Zod schemas as factory functions of t() (i18n) — auth.schema.ts, consumed by hooks/ via React Hook Form's resolver
         ├── services/        # auth.ts, user.ts — axios call functions
         └── types/           # Shared TS types (User, AuthResponse)
 ```

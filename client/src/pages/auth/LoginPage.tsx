@@ -12,7 +12,7 @@ const inputClass =
 export default function LoginPage() {
   const { t } = useTranslation()
   const { googleLogin } = useAuth()
-  const { fields, errors, isLoading, handleChange, handleSubmit } = useLoginForm()
+  const { register, errors, isSubmitting, handleSubmit } = useLoginForm()
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
@@ -31,14 +31,12 @@ export default function LoginPage() {
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 autoComplete="email"
-                value={fields.email}
-                onChange={handleChange}
                 className={inputClass}
+                {...register('email')}
               />
-              {errors.email && <p className="text-destructive text-xs">{errors.email}</p>}
+              {errors.email && <p className="text-destructive text-xs">{errors.email.message}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -55,18 +53,18 @@ export default function LoginPage() {
               </div>
               <input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="current-password"
-                value={fields.password}
-                onChange={handleChange}
                 className={inputClass}
+                {...register('password')}
               />
-              {errors.password && <p className="text-destructive text-xs">{errors.password}</p>}
+              {errors.password && (
+                <p className="text-destructive text-xs">{errors.password.message}</p>
+              )}
             </div>
 
-            <Button type="submit" disabled={isLoading} className="mt-2 w-full">
-              {isLoading ? t('common.loading') : t('common.login')}
+            <Button type="submit" disabled={isSubmitting} className="mt-2 w-full">
+              {isSubmitting ? t('common.loading') : t('common.login')}
             </Button>
           </form>
 

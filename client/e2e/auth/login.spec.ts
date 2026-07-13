@@ -17,17 +17,25 @@ test.describe('Login page', () => {
 
     test('shows invalid email error on bad format', async ({ page }) => {
       await page.fill('input[name="email"]', 'notanemail')
-      await page.fill('input[name="password"]', 'password')
+      await page.fill('input[name="password"]', 'password1')
       await page.click('button[type="submit"]')
       await expect(page.locator('p.text-destructive').first()).toBeVisible()
     })
 
-    test('shows password too short error under 8 chars', async ({ page }) => {
+    test('blocks a password that fails the policy regex without hitting the server', async ({
+      page,
+    }) => {
+      let requestFired = false
+      await page.route('**/auth/login', (route) => {
+        requestFired = true
+        return route.continue()
+      })
       await page.fill('input[name="email"]', 'test@abv.bg')
       await page.fill('input[name="password"]', 'short')
       await page.click('button[type="submit"]')
-      await expect(page.locator('p.text-destructive').first()).toBeVisible()
-      await expect(page).toHaveURL('/login')
+      await expect(page.locator('[data-sonner-toast]')).toBeVisible({ timeout: 5000 })
+      await expect(page.locator('p.text-destructive')).toHaveCount(0)
+      expect(requestFired).toBe(false)
     })
 
     test('clears field error when user starts typing', async ({ page }) => {
@@ -41,7 +49,7 @@ test.describe('Login page', () => {
   test.describe('server errors', () => {
     test('shows error toast on wrong password', async ({ page }) => {
       await page.fill('input[name="email"]', 'test@abv.bg')
-      await page.fill('input[name="password"]', 'wrongpassword')
+      await page.fill('input[name="password"]', 'wrongpass1')
       await page.click('button[type="submit"]')
       await expect(page.locator('[data-sonner-toast]')).toBeVisible({ timeout: 5000 })
       await expect(page).toHaveURL('/login')
@@ -59,7 +67,7 @@ test.describe('Login page', () => {
   test.describe('happy path', () => {
     test('logs in and redirects to home', async ({ page }) => {
       await page.fill('input[name="email"]', 'test@abv.bg')
-      await page.fill('input[name="password"]', 'password')
+      await page.fill('input[name="password"]', 'password1')
       await page.click('button[type="submit"]')
       await expect(page).toHaveURL('/', { timeout: 8000 })
     })
@@ -72,7 +80,7 @@ test.describe('Login page', () => {
         await route.continue()
       })
       await page.fill('input[name="email"]', 'test@abv.bg')
-      await page.fill('input[name="password"]', 'password')
+      await page.fill('input[name="password"]', 'password1')
       await page.click('button[type="submit"]')
       await expect(page.locator('button[type="submit"]')).toBeDisabled()
     })
@@ -88,7 +96,7 @@ test.describe('Login page', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/login')
       await page.fill('input[name="email"]', 'test@abv.bg')
-      await page.fill('input[name="password"]', 'password')
+      await page.fill('input[name="password"]', 'password1')
       await page.click('button[type="submit"]')
       await page.waitForURL((url) => !url.href.includes('/login'), { timeout: 8000 })
     })

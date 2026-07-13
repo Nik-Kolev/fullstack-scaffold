@@ -112,6 +112,7 @@
     "invalidEmail": "Invalid email address.",
     "passwordMin": "Password must be at least 8 characters, contain a letter and a number.",
     "passwordMismatch": "Passwords do not match.",
+    "invalidCredentials": "The email address or password you entered is incorrect. Please try again.",
     "generic": "Something went wrong. Please try again.",
     "boundary": {
       "title": "Something went wrong",
