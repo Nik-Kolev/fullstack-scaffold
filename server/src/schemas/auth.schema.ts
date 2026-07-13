@@ -1,15 +1,11 @@
 import z from 'zod';
 
-const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/;
+export const passwordRegex = /^(?=.*\d)[a-zA-Z0-9]{8,16}$/;
+const PASSWORD_MESSAGE = 'Password must be 8-16 characters and contain at least one number.';
 
 export const registerSchema = z.object({
 	email: z.email('Invalid email format.'),
-	password: z
-		.string()
-		.regex(
-			passwordRegex,
-			'Password must be at least 8 characters long, contain at least one letter and one number',
-		),
+	password: z.string().regex(passwordRegex, PASSWORD_MESSAGE),
 	name: z.string().min(1, 'Name is required.'),
 });
 
@@ -21,12 +17,7 @@ export const loginSchema = z.object({
 export const changePasswordSchema = z
 	.object({
 		currentPassword: z.string().min(1).optional(),
-		newPassword: z
-			.string()
-			.regex(
-				passwordRegex,
-				'Password must be at least 8 characters long, contain at least one letter and one number',
-			),
+		newPassword: z.string().regex(passwordRegex, PASSWORD_MESSAGE),
 	})
 	.refine(
 		(values) => {
@@ -44,12 +35,7 @@ export const emailSchema = z.object({
 
 export const resetPasswordSchema = z.object({
 	token: z.string().min(1),
-	newPassword: z
-		.string()
-		.regex(
-			passwordRegex,
-			'Password must be at least 8 characters long, contain at least one letter and one number',
-		),
+	newPassword: z.string().regex(passwordRegex, PASSWORD_MESSAGE),
 });
 
 export const googleCodeSchema = z.object({

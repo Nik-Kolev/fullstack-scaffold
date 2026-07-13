@@ -2,7 +2,7 @@ import prisma from '../src/lib/prisma.js';
 import bcrypt from 'bcrypt';
 
 async function seedData() {
-	const hashedPassword = await bcrypt.hash('password', 10);
+	const hashedPassword = await bcrypt.hash('password1', 10);
 
 	const user = await prisma.user.upsert({
 		where: { email: 'test@abv.bg' },

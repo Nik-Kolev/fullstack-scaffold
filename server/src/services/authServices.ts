@@ -9,54 +9,61 @@ import { google } from 'googleapis';
 import redis from '../lib/redis.js';
 import { emailQueue } from '../lib/bullmq.js';
 import crypto from 'crypto';
+import { passwordRegex } from '../schemas/auth.schema.js';
+
+const INVALID_CREDENTIALS_MESSAGE =
+	'The email address or password you entered is incorrect. Please try again.';
 
 export const createUser = async (data: Prisma.UserCreateInput & { password: string }) => {
 	const { password, ...rest } = data;
 	const hashedPassword = await bcrypt.hash(password, 10);
 
-	const user = await prisma.user.create({
-		data: { ...rest, password: hashedPassword },
+	const { user, accessToken, refreshToken } = await prisma.$transaction(async (tx) => {
+		const user = await tx.user.create({
+			data: { ...rest, password: hashedPassword },
+		});
+
+		const { accessToken, refreshToken } = JWT.generateTokenPair(user);
+
+		await tx.refreshToken.create({
+			data: {
+				userId: user.id,
+				refreshTokenId: refreshToken.refreshTokenId!,
+				expiresAt: refreshToken.expiryDate,
+			},
+		});
+
+		return { user, accessToken, refreshToken };
 	});
 
-	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
-
-	await prisma.refreshToken.create({
-		data: {
-			userId: user.id,
-			refreshTokenId: refreshToken.refreshTokenId!,
-			expiresAt: refreshToken.expiryDate,
-		},
-	});
-
-	await emailQueue.add('welcome', { name: user.name, email: user.email });
+	try {
+		await emailQueue.add('welcome', { name: user.name, email: user.email });
+	} catch (_) {
+		// Redis failure — registration already succeeded, email is non-critical
+	}
 
 	return { user: toSafeUser(user), accessToken, refreshToken };
 };
 
 export const loginUser = async (email: string, password: string) => {
+	if (!passwordRegex.test(password)) {
+		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE); // shape alone proves it can't be a real password
+	}
+
 	const userMatch = await prisma.user.findUnique({ where: { email }, omit: { password: false } });
 
 	if (!userMatch) {
-		throw new CustomError(
-			401,
-			'The email address or password you entered is incorrect. Please try again.',
-		);
+		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE);
 	}
 
 	if (!userMatch.password) {
-		throw new CustomError(
-			401,
-			'The email address or password you entered is incorrect. Please try again.',
-		);
+		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE);
 	}
 
 	const isPasswordValid = await bcrypt.compare(password, userMatch.password);
 
 	if (!isPasswordValid) {
-		throw new CustomError(
-			401,
-			'The email address or password you entered is incorrect. Please try again.',
-		);
+		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE);
 	}
 
 	const { accessToken, refreshToken } = JWT.generateTokenPair(userMatch);
@@ -202,7 +209,11 @@ export const changePassword = async (
 		}),
 	]);
 
-	await emailQueue.add('password-changed', { name: user.name, email: user.email });
+	try {
+		await emailQueue.add('password-changed', { name: user.name, email: user.email });
+	} catch (_) {
+		// Redis failure — password already changed, email is non-critical
+	}
 
 	return { accessToken, refreshToken, user: toSafeUser(updatedUser) };
 };
@@ -216,17 +227,26 @@ export const forgotPassword = async (email: string) => {
 	const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 	const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-	await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+	await prisma.$transaction([
+		prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
+		prisma.passwordResetToken.create({
+			data: {
+				passwordResetToken: tokenHash,
+				userId: user.id,
+				expiresAt,
+			},
+		}),
+	]);
 
-	await prisma.passwordResetToken.create({
-		data: {
-			passwordResetToken: tokenHash,
-			userId: user.id,
-			expiresAt,
-		},
-	});
-
-	await emailQueue.add('password-reset', { name: user.name, email: user.email, token: rawToken });
+	try {
+		await emailQueue.add('password-reset', {
+			name: user.name,
+			email: user.email,
+			token: rawToken,
+		});
+	} catch (_) {
+		// Redis failure — token already persisted, email is non-critical
+	}
 };
 
 export const resetPassword = async (token: string, newPassword: string) => {
@@ -258,7 +278,11 @@ export const resetPassword = async (token: string, newPassword: string) => {
 		}),
 	]);
 
-	await emailQueue.add('password-changed', { name: user.user.name, email: user.user.email });
+	try {
+		await emailQueue.add('password-changed', { name: user.user.name, email: user.user.email });
+	} catch (_) {
+		// Redis failure — password already reset, email is non-critical
+	}
 
 	return { accessToken, refreshToken, user: toSafeUser(updatedUser) };
 };

@@ -11,6 +11,8 @@ if (!email || !password || !name) {
 	process.exit(1);
 }
 
+// ADMIN_PASSWORD isn't policy-checked here — if it doesn't match (8-16 chars, needs a digit), loginUser rejects it later.
+
 async function createAdmin() {
 	const hashedPassword = await bcrypt.hash(password, 10);
 

@@ -28,6 +28,7 @@ npm run db:studio         # Prisma Studio
 npm run create-admin      # ADMIN_EMAIL=... ADMIN_PASSWORD=... ADMIN_NAME=... npm run create-admin
                            # upserts a role:admin user — safe to run in production (unlike db:fresh/db:seed's
                            # known test credentials). Values must be env vars, never CLI args (shell history).
+                           # ADMIN_PASSWORD isn't policy-checked here — loginUser rejects it later if it doesn't match.
 
 # Tests
 npm run test              # vitest run (single pass)
@@ -54,7 +55,7 @@ npm run format            # prettier --write src/**/*.ts
 - `errorHandler` middleware maps: CustomError → its fields, Prisma known errors → PRISMA_ERROR_MAP, PrismaClientValidationError → 400, generic Error → 500.
 - Only add try/catch in a service when you need to produce a more specific message than the default Prisma mapping provides.
 - Exception: use try/catch in a controller when you need a side-effect before rethrowing (e.g., `clearCookie` on failed refresh) — always rethrow so `errorHandler` still processes it.
-- Exception: use try/catch in a controller to swallow errors for non-critical side effects that must not abort a successful response (e.g., Redis blacklist after password change) — add a comment explaining why.
+- Exception: use try/catch in a controller **or service** to swallow errors for non-critical side effects that must not abort a successful response (e.g., Redis blacklist after logout; `emailQueue.add` calls in `authServices.ts`, which stay in the service since they immediately follow the DB write they're reporting on) — add a comment explaining why.
 
 ### Validation
 
