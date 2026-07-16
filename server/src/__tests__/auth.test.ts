@@ -82,6 +82,7 @@ describe('POST /api/auth/register', () => {
 		const res = await register();
 
 		expect(res.status).toBe(409);
+		expect(res.body.code).toBe('EMAIL_TAKEN');
 	});
 
 	it('returns 400 for invalid email format', async () => {
@@ -90,6 +91,8 @@ describe('POST /api/auth/register', () => {
 			.send({ email: 'not-an-email', password: 'Test1234' });
 
 		expect(res.status).toBe(400);
+		expect(res.body.code).toBe('VALIDATION_ERROR');
+		expect(Array.isArray(res.body.details)).toBe(true);
 	});
 
 	it('returns 400 for weak password', async () => {
@@ -98,12 +101,14 @@ describe('POST /api/auth/register', () => {
 			.send({ email: TEST_USER.email, password: 'short' });
 
 		expect(res.status).toBe(400);
+		expect(res.body.code).toBe('VALIDATION_ERROR');
 	});
 
 	it('returns 400 when password is missing', async () => {
 		const res = await request(app).post('/api/auth/register').send({ email: TEST_USER.email });
 
 		expect(res.status).toBe(400);
+		expect(res.body.code).toBe('VALIDATION_ERROR');
 	});
 });
 
@@ -135,6 +140,7 @@ describe('POST /api/auth/login', () => {
 			.send({ email: TEST_USER.email, password: 'WrongPass1' });
 
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('INVALID_CREDENTIALS');
 	});
 
 	it('returns 401 for unknown email', async () => {
@@ -143,12 +149,14 @@ describe('POST /api/auth/login', () => {
 			.send({ email: 'nobody@example.com', password: 'Test1234' });
 
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('INVALID_CREDENTIALS');
 	});
 
 	it('returns 400 when fields are missing', async () => {
 		const res = await request(app).post('/api/auth/login').send({});
 
 		expect(res.status).toBe(400);
+		expect(res.body.code).toBe('VALIDATION_ERROR');
 	});
 });
 
@@ -550,6 +558,7 @@ describe('POST /api/auth/reset-password', () => {
 
 		const res = await resetPassword(token, 'AnotherPass99');
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('INVALID_RESET_TOKEN');
 	});
 
 	it('invalidates all existing refresh tokens on reset', async () => {
@@ -568,6 +577,7 @@ describe('POST /api/auth/reset-password', () => {
 	it('returns 401 for an invalid token', async () => {
 		const res = await resetPassword('invalidtoken', 'NewPass5678');
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('INVALID_RESET_TOKEN');
 	});
 
 	it('returns 401 for an expired token', async () => {
@@ -586,12 +596,14 @@ describe('POST /api/auth/reset-password', () => {
 
 		const res = await resetPassword(rawToken, 'NewPass5678');
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('INVALID_RESET_TOKEN');
 	});
 
 	it('returns 400 for a weak newPassword', async () => {
 		const token = await getResetToken();
 		const res = await resetPassword(token, 'weak');
 		expect(res.status).toBe(400);
+		expect(res.body.code).toBe('VALIDATION_ERROR');
 	});
 
 	it('returns 400 when token is missing', async () => {
@@ -599,6 +611,7 @@ describe('POST /api/auth/reset-password', () => {
 			.post('/api/auth/reset-password')
 			.send({ newPassword: 'NewPass5678' });
 		expect(res.status).toBe(400);
+		expect(res.body.code).toBe('VALIDATION_ERROR');
 	});
 });
 

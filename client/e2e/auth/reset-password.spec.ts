@@ -67,13 +67,15 @@ test.describe('Reset password page — with token', () => {
         route.fulfill({
           status: 401,
           contentType: 'application/json',
-          body: JSON.stringify({ message: 'Invalid or expired reset token.' }),
+          body: JSON.stringify({ statusCode: 401, code: 'INVALID_RESET_TOKEN' }),
         }),
       )
       await page.fill('input[name="newPassword"]', 'password123')
       await page.fill('input[name="confirmPassword"]', 'password123')
       await page.click('button[type="submit"]')
-      await expect(page.locator('[data-sonner-toast]')).toBeVisible({ timeout: 5000 })
+      await expect(page.getByText('This reset link is invalid or has expired.')).toBeVisible({
+        timeout: 5000,
+      })
       await expect(page).toHaveURL(/\/reset-password/)
     })
   })
@@ -112,7 +114,7 @@ test.describe('Reset password page — with token', () => {
         await route.fulfill({
           status: 400,
           contentType: 'application/json',
-          body: JSON.stringify({ message: 'Invalid or expired reset token.' }),
+          body: JSON.stringify({ statusCode: 400, code: 'VALIDATION_ERROR' }),
         })
       })
       await page.fill('input[name="newPassword"]', 'password123')
