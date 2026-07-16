@@ -1,66 +1,40 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
-import { useState } from 'react'
+import { useMemo } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useAuth } from '@/context/AuthContext'
-
-const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/
-
-type Fields = { newPassword: string; confirmPassword: string }
-type FieldErrors = Partial<Record<keyof Fields, string>>
+import { buildResetPasswordSchema, type ResetPasswordFormValues } from '@/schemas/auth.schema'
 
 export function useResetPasswordForm(token: string) {
   const { t } = useTranslation()
   const { resetPassword } = useAuth()
   const navigate = useNavigate()
 
-  const [fields, setFields] = useState<Fields>({ newPassword: '', confirmPassword: '' })
-  const [errors, setErrors] = useState<FieldErrors>({})
-  const [isLoading, setIsLoading] = useState(false)
+  const schema = useMemo(() => buildResetPasswordSchema(t), [t])
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ResetPasswordFormValues>({ resolver: zodResolver(schema) })
 
-  const validate = (): boolean => {
-    const next: FieldErrors = {}
-    if (!fields.newPassword) {
-      next.newPassword = t('errors.required')
-    } else if (!passwordRegex.test(fields.newPassword)) {
-      next.newPassword = t('errors.passwordMin')
-    }
-    if (!fields.confirmPassword) {
-      next.confirmPassword = t('errors.required')
-      // guard prevents a false mismatch error when confirmPassword is filled but newPassword is still empty
-    } else if (fields.newPassword && fields.confirmPassword !== fields.newPassword) {
-      next.confirmPassword = t('errors.passwordMismatch')
-    }
-    setErrors(next)
-    return Object.keys(next).length === 0
-  }
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFields((prev) => ({ ...prev, [name]: value }))
-    setErrors((prev) => ({ ...prev, [name]: undefined }))
-  }
-
-  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!validate()) return
-    setIsLoading(true)
+  const onSubmit = async (data: ResetPasswordFormValues) => {
     try {
-      await resetPassword({ token, newPassword: fields.newPassword })
+      await resetPassword({ token, newPassword: data.newPassword })
       toast.success(t('auth.resetPassword.successMessage'))
       navigate('/')
     } catch (err) {
-      const message =
-        axios.isAxiosError(err) && err.response?.data?.message
-          ? (err.response.data.message as string)
-          : t('errors.generic')
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
+      const code = axios.isAxiosError(err)
+        ? (err.response?.data as { code?: string } | undefined)?.code
+        : undefined
+      toast.error(
+        code === 'INVALID_RESET_TOKEN' ? t('auth.resetPassword.invalidToken') : t('errors.generic'),
+      )
     }
   }
 
-  return { fields, errors, isLoading, handleChange, handleSubmit }
+  return { register, errors, isSubmitting, handleSubmit: handleSubmit(onSubmit) }
 }

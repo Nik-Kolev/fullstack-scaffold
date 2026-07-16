@@ -10,8 +10,7 @@ const inputClass =
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation()
-  const { fields, errors, isLoading, submitted, handleChange, handleSubmit } =
-    useForgotPasswordForm()
+  const { register, errors, isSubmitting, submitted, handleSubmit } = useForgotPasswordForm()
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
@@ -48,18 +47,18 @@ export default function ForgotPasswordPage() {
                   </label>
                   <input
                     id="email"
-                    name="email"
                     type="email"
                     autoComplete="email"
-                    value={fields.email}
-                    onChange={handleChange}
                     className={inputClass}
+                    {...register('email')}
                   />
-                  {errors.email && <p className="text-destructive text-xs">{errors.email}</p>}
+                  {errors.email && (
+                    <p className="text-destructive text-xs">{errors.email.message}</p>
+                  )}
                 </div>
 
-                <Button type="submit" disabled={isLoading} className="mt-2 w-full">
-                  {isLoading ? t('common.loading') : t('auth.forgotPassword.button')}
+                <Button type="submit" disabled={isSubmitting} className="mt-2 w-full">
+                  {isSubmitting ? t('common.loading') : t('auth.forgotPassword.button')}
                 </Button>
               </form>
 

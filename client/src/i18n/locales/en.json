@@ -110,9 +110,10 @@
   "errors": {
     "required": "This field is required.",
     "invalidEmail": "Invalid email address.",
-    "passwordMin": "Password must be at least 8 characters, contain a letter and a number.",
+    "passwordMin": "Password must be 8-16 characters and contain at least one letter and one number.",
     "passwordMismatch": "Passwords do not match.",
     "invalidCredentials": "The email address or password you entered is incorrect. Please try again.",
+    "emailTaken": "An account with this email address already exists.",
     "generic": "Something went wrong. Please try again.",
     "boundary": {
       "title": "Something went wrong",

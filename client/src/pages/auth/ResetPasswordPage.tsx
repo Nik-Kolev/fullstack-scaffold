@@ -13,7 +13,7 @@ export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
 
-  const { fields, errors, isLoading, handleChange, handleSubmit } = useResetPasswordForm(token)
+  const { register, errors, isSubmitting, handleSubmit } = useResetPasswordForm(token)
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
@@ -48,15 +48,13 @@ export default function ResetPasswordPage() {
                   </label>
                   <input
                     id="newPassword"
-                    name="newPassword"
                     type="password"
                     autoComplete="new-password"
-                    value={fields.newPassword}
-                    onChange={handleChange}
                     className={inputClass}
+                    {...register('newPassword')}
                   />
                   {errors.newPassword && (
-                    <p className="text-destructive text-xs">{errors.newPassword}</p>
+                    <p className="text-destructive text-xs">{errors.newPassword.message}</p>
                   )}
                 </div>
 
@@ -66,20 +64,18 @@ export default function ResetPasswordPage() {
                   </label>
                   <input
                     id="confirmPassword"
-                    name="confirmPassword"
                     type="password"
                     autoComplete="new-password"
-                    value={fields.confirmPassword}
-                    onChange={handleChange}
                     className={inputClass}
+                    {...register('confirmPassword')}
                   />
                   {errors.confirmPassword && (
-                    <p className="text-destructive text-xs">{errors.confirmPassword}</p>
+                    <p className="text-destructive text-xs">{errors.confirmPassword.message}</p>
                   )}
                 </div>
 
-                <Button type="submit" disabled={isLoading} className="mt-2 w-full">
-                  {isLoading ? t('common.loading') : t('auth.resetPassword.button')}
+                <Button type="submit" disabled={isSubmitting} className="mt-2 w-full">
+                  {isSubmitting ? t('common.loading') : t('auth.resetPassword.button')}
                 </Button>
               </form>
             </>

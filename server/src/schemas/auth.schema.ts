@@ -1,7 +1,8 @@
 import z from 'zod';
 
-export const passwordRegex = /^(?=.*\d)[a-zA-Z0-9]{8,16}$/;
-const PASSWORD_MESSAGE = 'Password must be 8-16 characters and contain at least one number.';
+export const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z0-9!@#$%^&*_-]{8,16}$/;
+const PASSWORD_MESSAGE =
+	'Password must be 8-16 characters and contain at least one letter and one number.';
 
 export const registerSchema = z.object({
 	email: z.email('Invalid email format.'),

@@ -12,7 +12,7 @@ const inputClass =
 export default function RegisterPage() {
   const { t } = useTranslation()
   const { googleLogin } = useAuth()
-  const { fields, errors, isLoading, handleChange, handleSubmit } = useRegisterForm()
+  const { register, errors, isSubmitting, handleSubmit } = useRegisterForm()
 
   return (
     <div className="bg-background flex min-h-screen flex-col">
@@ -31,14 +31,12 @@ export default function RegisterPage() {
               </label>
               <input
                 id="name"
-                name="name"
                 type="text"
                 autoComplete="name"
-                value={fields.name}
-                onChange={handleChange}
                 className={inputClass}
+                {...register('name')}
               />
-              {errors.name && <p className="text-destructive text-xs">{errors.name}</p>}
+              {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -47,14 +45,12 @@ export default function RegisterPage() {
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 autoComplete="email"
-                value={fields.email}
-                onChange={handleChange}
                 className={inputClass}
+                {...register('email')}
               />
-              {errors.email && <p className="text-destructive text-xs">{errors.email}</p>}
+              {errors.email && <p className="text-destructive text-xs">{errors.email.message}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -63,14 +59,14 @@ export default function RegisterPage() {
               </label>
               <input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="new-password"
-                value={fields.password}
-                onChange={handleChange}
                 className={inputClass}
+                {...register('password')}
               />
-              {errors.password && <p className="text-destructive text-xs">{errors.password}</p>}
+              {errors.password && (
+                <p className="text-destructive text-xs">{errors.password.message}</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -79,20 +75,18 @@ export default function RegisterPage() {
               </label>
               <input
                 id="confirmPassword"
-                name="confirmPassword"
                 type="password"
                 autoComplete="new-password"
-                value={fields.confirmPassword}
-                onChange={handleChange}
                 className={inputClass}
+                {...register('confirmPassword')}
               />
               {errors.confirmPassword && (
-                <p className="text-destructive text-xs">{errors.confirmPassword}</p>
+                <p className="text-destructive text-xs">{errors.confirmPassword.message}</p>
               )}
             </div>
 
-            <Button type="submit" disabled={isLoading} className="mt-2 w-full">
-              {isLoading ? t('common.loading') : t('common.register')}
+            <Button type="submit" disabled={isSubmitting} className="mt-2 w-full">
+              {isSubmitting ? t('common.loading') : t('common.register')}
             </Button>
           </form>
 

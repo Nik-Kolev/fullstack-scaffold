@@ -22,24 +22,26 @@ const MULTER_ERROR_MAP: Record<string, { statusCode: number; message: string }> 
 	},
 };
 
-function extractPrismaMeta(meta: unknown): unknown {
+function extractPrismaFields(meta: unknown): unknown[] | undefined {
 	if (!meta || typeof meta !== 'object') return undefined;
 	const m = meta as Record<string, unknown>;
 	const driverAdapterError = m.driverAdapterError as
 		| { cause?: { constraint?: { fields?: unknown } } }
 		| undefined;
 	const fields = driverAdapterError?.cause?.constraint?.fields ?? m.target;
-	return fields ? { fields } : undefined;
+	return Array.isArray(fields) ? fields : undefined;
 }
 
 function errorHandler(error: unknown, req: Request, res: Response, _next: NextFunction): void {
 	let message = 'Internal server error';
 	let statusCode = 500;
+	let code: string | undefined;
 	let details: unknown;
 
 	if (error instanceof CustomError) {
 		message = error.message;
 		statusCode = error.statusCode;
+		code = error.code;
 		details = error.details;
 	} else if (error instanceof multer.MulterError) {
 		const mapped = MULTER_ERROR_MAP[error.code];
@@ -56,19 +58,21 @@ function errorHandler(error: unknown, req: Request, res: Response, _next: NextFu
 		if (mapped) {
 			message = mapped.message;
 			statusCode = mapped.statusCode;
-			details = extractPrismaMeta(error.meta);
+			if (error.code === 'P2002' && extractPrismaFields(error.meta)?.includes('email')) {
+				code = 'EMAIL_TAKEN';
+				message = 'An account with this email already exists.';
+			}
 		}
 	} else if (error instanceof Prisma.PrismaClientValidationError) {
 		message = 'Invalid request data.';
 		statusCode = 400;
-		details = error.message.split('\n').at(-1)?.trim();
 	} else if (error instanceof Error) {
 		message = error.message;
 	}
 
 	console.error(`[${req.method}] ${req.path} >> ${statusCode} >> ${message}`);
 
-	res.status(statusCode).json({ message, details });
+	res.status(statusCode).json({ statusCode, code, details });
 }
 
 export default errorHandler;

@@ -1,56 +1,33 @@
-import axios from 'axios'
-import { useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { useAuth } from '@/context/AuthContext'
-
-type Fields = { email: string }
-type FieldErrors = Partial<Record<keyof Fields, string>>
+import { buildForgotPasswordSchema, type ForgotPasswordFormValues } from '@/schemas/auth.schema'
 
 export function useForgotPasswordForm() {
   const { t } = useTranslation()
   const { forgotPassword } = useAuth()
-
-  const [fields, setFields] = useState<Fields>({ email: '' })
-  const [errors, setErrors] = useState<FieldErrors>({})
-  const [isLoading, setIsLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  const validate = (): boolean => {
-    const next: FieldErrors = {}
-    if (!fields.email) {
-      next.email = t('errors.required')
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) {
-      next.email = t('errors.invalidEmail')
-    }
-    setErrors(next)
-    return Object.keys(next).length === 0
-  }
+  const schema = useMemo(() => buildForgotPasswordSchema(t), [t])
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ForgotPasswordFormValues>({ resolver: zodResolver(schema) })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFields((prev) => ({ ...prev, [name]: value }))
-    setErrors((prev) => ({ ...prev, [name]: undefined }))
-  }
-
-  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!validate()) return
-    setIsLoading(true)
+  const onSubmit = async (data: ForgotPasswordFormValues) => {
     try {
-      await forgotPassword(fields)
+      await forgotPassword(data)
       setSubmitted(true)
-    } catch (err) {
-      const message =
-        axios.isAxiosError(err) && err.response?.data?.message
-          ? (err.response.data.message as string)
-          : t('errors.generic')
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
+    } catch {
+      // service never throws a named error (never reveals account existence) — generic fallback only
+      toast.error(t('errors.generic'))
     }
   }
 
-  return { fields, errors, isLoading, submitted, handleChange, handleSubmit }
+  return { register, errors, isSubmitting, submitted, handleSubmit: handleSubmit(onSubmit) }
 }

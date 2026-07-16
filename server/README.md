@@ -168,6 +168,12 @@ prisma/
 
 Key contracts to know when writing frontend service calls:
 
+### Errors
+
+Every error response is `{ statusCode, code, details }` — no `message` field. `code` is the stable, machine-readable value to dispatch UI copy off (never display raw server text — see `zod.md`'s client rules). `details` is only ever populated for `VALIDATION_ERROR` (a `[{ field, message }]` array); every other code sends `details: undefined` since the code alone already implies which field/flow is affected.
+
+Named codes in use so far: `VALIDATION_ERROR` (any Zod shape mismatch, all routes), `INVALID_CREDENTIALS` (login), `EMAIL_TAKEN` (register), `INVALID_RESET_TOKEN` (reset-password). Routes without a named code yet (e.g. change-password) still return `{ statusCode }` with `code: undefined` — fall back to a generic message for those.
+
 ### Auth
 
 - `GET /user/me` → `{ user }` — includes `hasPassword: boolean` (computed). Use this, not `googleId`, to decide whether to show the current-password field on the change-password form. A Google user who has since set a password will have both `googleId` set and `hasPassword: true`.

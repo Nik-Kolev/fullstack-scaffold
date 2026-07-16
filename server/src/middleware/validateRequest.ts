@@ -10,7 +10,7 @@ function validate(schema: ZodType, from: 'body' | 'query') {
 				field: e.path.join('.'),
 				message: e.message,
 			}));
-			throw new CustomError(400, 'Validation failed.', details);
+			throw new CustomError(400, 'Validation failed.', 'VALIDATION_ERROR', details);
 		}
 		if (from === 'body') req.body = result.data;
 		next();

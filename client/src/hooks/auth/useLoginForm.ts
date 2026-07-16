@@ -27,11 +27,12 @@ export function useLoginForm() {
     try {
       await login(data)
     } catch (err) {
-      const message =
-        axios.isAxiosError(err) && err.response?.data?.message
-          ? (err.response.data.message as string)
-          : t('errors.generic')
-      toast.error(message)
+      const code = axios.isAxiosError(err)
+        ? (err.response?.data as { code?: string } | undefined)?.code
+        : undefined
+      toast.error(
+        code === 'INVALID_CREDENTIALS' ? t('errors.invalidCredentials') : t('errors.generic'),
+      )
     }
   }
 

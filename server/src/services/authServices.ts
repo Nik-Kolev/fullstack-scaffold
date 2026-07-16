@@ -47,23 +47,23 @@ export const createUser = async (data: Prisma.UserCreateInput & { password: stri
 
 export const loginUser = async (email: string, password: string) => {
 	if (!passwordRegex.test(password)) {
-		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE); // shape alone proves it can't be a real password
+		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE, 'INVALID_CREDENTIALS'); // shape alone proves it can't be a real password
 	}
 
 	const userMatch = await prisma.user.findUnique({ where: { email }, omit: { password: false } });
 
 	if (!userMatch) {
-		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE);
+		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE, 'INVALID_CREDENTIALS');
 	}
 
 	if (!userMatch.password) {
-		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE);
+		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE, 'INVALID_CREDENTIALS');
 	}
 
 	const isPasswordValid = await bcrypt.compare(password, userMatch.password);
 
 	if (!isPasswordValid) {
-		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE);
+		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE, 'INVALID_CREDENTIALS');
 	}
 
 	const { accessToken, refreshToken } = JWT.generateTokenPair(userMatch);
@@ -258,7 +258,7 @@ export const resetPassword = async (token: string, newPassword: string) => {
 	});
 
 	if (!user || user.expiresAt < new Date()) {
-		throw new CustomError(401, 'Invalid or expired reset token.');
+		throw new CustomError(401, 'Invalid or expired reset token.', 'INVALID_RESET_TOKEN');
 	}
 
 	const newHashedPassword = await bcrypt.hash(newPassword, 10);
