@@ -19,9 +19,6 @@
   "nav": {
     "logoAlt": "Лого на Scaffold",
     "home": "Начало",
-    "dashboard": "Табло",
-    "upload": "Качване",
-    "live": "На живо",
     "terms": "Условия",
     "privacy": "Поверителност",
     "cookies": "Бисквитки"
@@ -36,9 +33,6 @@
     },
     "links": {
       "home": "Начало",
-      "dashboard": "Табло",
-      "upload": "Качване",
-      "live": "На живо",
       "github": "GitHub",
       "contact": "Контакти",
       "about": "За нас",
@@ -92,17 +86,11 @@
       "title": "Scaffold",
       "subtitle": "Изчистен fullstack шаблон."
     },
-    "dashboard": {
-      "title": "Табло",
-      "welcome": "Добре дошли, {{name}}"
-    },
     "notFound": {
       "title": "Страницата не е намерена",
       "message": "Страницата, която търсите, не съществува или е преместена.",
       "goHome": "Към началната страница"
     },
-    "upload": { "title": "Качване" },
-    "live": { "title": "На живо" },
     "terms": { "title": "Условия за ползване" },
     "privacy": { "title": "Политика за поверителност" },
     "cookies": { "title": "Политика за бисквитки" }

@@ -12,12 +12,6 @@ const publicLinks = [
   { to: '/cookies', labelKey: 'nav.cookies' },
 ]
 
-const authLinks = [
-  { to: '/dashboard', labelKey: 'nav.dashboard' },
-  { to: '/upload', labelKey: 'nav.upload' },
-  { to: '/live', labelKey: 'nav.live' },
-]
-
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
     'relative w-fit whitespace-nowrap pb-1 text-foreground transition-colors',
@@ -71,12 +65,6 @@ export default function Navbar() {
               {t(labelKey)}
             </NavLink>
           ))}
-          {user &&
-            authLinks.map(({ to, labelKey }) => (
-              <NavLink key={to} to={to} className={linkClass}>
-                {t(labelKey)}
-              </NavLink>
-            ))}
         </nav>
 
         <div className="col-start-3 flex items-center justify-end gap-3">
@@ -130,12 +118,6 @@ export default function Navbar() {
                 {t(labelKey)}
               </NavLink>
             ))}
-            {user &&
-              authLinks.map(({ to, labelKey }) => (
-                <NavLink key={to} to={to} className={linkClass} onClick={handleMobileNav}>
-                  {t(labelKey)}
-                </NavLink>
-              ))}
           </nav>
           <div className="mt-4 flex items-center justify-center gap-3 border-t pt-4">
             {user ? (

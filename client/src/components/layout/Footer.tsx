@@ -91,21 +91,6 @@ export default function Footer() {
                     {t('footer.links.home')}
                   </Link>
                 </li>
-                <li>
-                  <Link to="/dashboard" className="hover:text-foreground transition-colors">
-                    {t('footer.links.dashboard')}
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/upload" className="hover:text-foreground transition-colors">
-                    {t('footer.links.upload')}
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/live" className="hover:text-foreground transition-colors">
-                    {t('footer.links.live')}
-                  </Link>
-                </li>
               </ul>
             </div>
 

@@ -19,9 +19,6 @@
   "nav": {
     "logoAlt": "Scaffold logo",
     "home": "Home",
-    "dashboard": "Dashboard",
-    "upload": "Upload",
-    "live": "Live",
     "terms": "Terms",
     "privacy": "Privacy",
     "cookies": "Cookies"
@@ -36,9 +33,6 @@
     },
     "links": {
       "home": "Home",
-      "dashboard": "Dashboard",
-      "upload": "Upload",
-      "live": "Live",
       "github": "GitHub",
       "contact": "Contact",
       "about": "About",
@@ -92,17 +86,11 @@
       "title": "Scaffold",
       "subtitle": "A clean fullstack starter."
     },
-    "dashboard": {
-      "title": "Dashboard",
-      "welcome": "Welcome, {{name}}"
-    },
     "notFound": {
       "title": "Page not found",
       "message": "The page you're looking for doesn't exist or has been moved.",
       "goHome": "Go home"
     },
-    "upload": { "title": "Upload" },
-    "live": { "title": "Live" },
     "terms": { "title": "Terms of Service" },
     "privacy": { "title": "Privacy Policy" },
     "cookies": { "title": "Cookie Policy" }

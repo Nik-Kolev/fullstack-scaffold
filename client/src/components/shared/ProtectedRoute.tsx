@@ -21,7 +21,7 @@ export default function ProtectedRoute({ requiredRole, redirectTo = '/login' }: 
 
   if (!isAuthenticated) return <Navigate to={redirectTo} replace />
 
-  if (requiredRole && user?.role !== requiredRole) return <Navigate to="/dashboard" replace />
+  if (requiredRole && user?.role !== requiredRole) return <Navigate to="/" replace />
 
   return <Outlet />
 }
