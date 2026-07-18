@@ -271,6 +271,41 @@ describe('GET /api/product', () => {
 		});
 	});
 
+	describe('search', () => {
+		it('matches a partial, case-insensitive substring of the name with no false positives', async () => {
+			await seedProduct({ name: 'Wireless Mouse' });
+			await seedProduct({ name: 'Mechanical Keyboard' });
+
+			const res = await request(app).get('/api/product?search=mouse');
+			expect(res.status).toBe(200);
+			expect(res.body.products.map((p: { name: string }) => p.name)).toEqual([
+				'Wireless Mouse',
+			]);
+		});
+
+		it('is case-insensitive', async () => {
+			await seedProduct({ name: 'Wireless Mouse' });
+
+			const res = await request(app).get('/api/product?search=MOUSE');
+			expect(res.status).toBe(200);
+			expect(res.body.products.map((p: { name: string }) => p.name)).toEqual([
+				'Wireless Mouse',
+			]);
+		});
+
+		it('composes with other filters', async () => {
+			const otherCategory = await prisma.productCategory.create({ data: { name: 'Other' } });
+			await seedProduct({ name: 'Wireless Mouse' });
+			await seedProduct({ name: 'Wireless Mouse', categoryId: otherCategory.id });
+
+			const res = await request(app).get(
+				`/api/product?search=mouse&categoryId=${categoryId}`,
+			);
+			expect(res.status).toBe(200);
+			expect(res.body.products).toHaveLength(1);
+		});
+	});
+
 	describe('sorting', () => {
 		it('defaults to newest first', async () => {
 			const older = await seedProduct({ name: 'Older', createdAt: new Date('2024-01-01') });
