@@ -12,6 +12,7 @@ model User {
     passwordResetTokens PasswordResetToken[]
     userFiles           UserFile[]
     payments            Payment[]
+    likes               Like[]
 
     @@map("users")
 }

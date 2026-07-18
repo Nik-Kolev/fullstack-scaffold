@@ -11,6 +11,7 @@ const PRISMA_ERROR_MAP: Record<string, { statusCode: number; message: string }> 
 	P2002: { statusCode: 409, message: 'A record with this value already exists.' },
 	P2003: { statusCode: 400, message: 'Related record not found.' },
 	P2011: { statusCode: 400, message: 'A required field is missing.' },
+	P2020: { statusCode: 400, message: 'A value is out of range for its field.' },
 	P2025: { statusCode: 404, message: 'Record not found.' },
 };
 
@@ -22,6 +23,17 @@ const MULTER_ERROR_MAP: Record<string, { statusCode: number; message: string }> 
 	},
 };
 
+// Keyed by the violated unique constraint's DB column names (snake_case,
+// per @map — not the Prisma field names), sorted + joined so lookup is
+// order-independent and scales to compound constraints without new branches.
+const UNIQUE_CONSTRAINT_CODES: Record<string, { code: string; message: string }> = {
+	email: { code: 'EMAIL_TAKEN', message: 'An account with this email already exists.' },
+	'product_id,user_id': {
+		code: 'ALREADY_LIKED',
+		message: 'You have already liked this product.',
+	},
+};
+
 function extractPrismaFields(meta: unknown): unknown[] | undefined {
 	if (!meta || typeof meta !== 'object') return undefined;
 	const m = meta as Record<string, unknown>;
@@ -30,6 +42,12 @@ function extractPrismaFields(meta: unknown): unknown[] | undefined {
 		| undefined;
 	const fields = driverAdapterError?.cause?.constraint?.fields ?? m.target;
 	return Array.isArray(fields) ? fields : undefined;
+}
+
+function mapUniqueConstraintError(meta: unknown) {
+	const fields = extractPrismaFields(meta);
+	if (!fields) return undefined;
+	return UNIQUE_CONSTRAINT_CODES[fields.map(String).sort().join(',')];
 }
 
 function errorHandler(error: unknown, req: Request, res: Response, _next: NextFunction): void {
@@ -58,9 +76,12 @@ function errorHandler(error: unknown, req: Request, res: Response, _next: NextFu
 		if (mapped) {
 			message = mapped.message;
 			statusCode = mapped.statusCode;
-			if (error.code === 'P2002' && extractPrismaFields(error.meta)?.includes('email')) {
-				code = 'EMAIL_TAKEN';
-				message = 'An account with this email already exists.';
+			if (error.code === 'P2002') {
+				const specific = mapUniqueConstraintError(error.meta);
+				if (specific) {
+					code = specific.code;
+					message = specific.message;
+				}
 			}
 		}
 	} else if (error instanceof Prisma.PrismaClientValidationError) {

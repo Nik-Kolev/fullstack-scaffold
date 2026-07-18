@@ -26,12 +26,39 @@ async function seedData() {
 		},
 	});
 
+	const electronics = await prisma.productCategory.upsert({
+		where: { name: 'Electronics' },
+		update: {},
+		create: { name: 'Electronics' },
+	});
+	const books = await prisma.productCategory.upsert({
+		where: { name: 'Books' },
+		update: {},
+		create: { name: 'Books' },
+	});
+
 	const productCount = await prisma.product.count();
 	if (productCount === 0) {
 		await prisma.product.createMany({
 			data: [
-				{ name: 'Basic Plan', price: 999, description: 'Great for getting started' },
-				{ name: 'Pro Plan', price: 2999, description: 'Perfect for growing teams' },
+				{
+					name: 'Wireless Bluetooth Headphones',
+					price: 7999,
+					description: 'Over-ear headphones with active noise cancellation',
+					categoryId: electronics.id,
+					quantity: 50,
+					color: 'black',
+					shape: 'oval',
+				},
+				{
+					name: 'The Pragmatic Programmer',
+					price: 3499,
+					description: 'Classic guide to software craftsmanship',
+					categoryId: books.id,
+					quantity: 20,
+					color: 'orange',
+					shape: 'rectangle',
+				},
 			],
 		});
 	}

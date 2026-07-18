@@ -3,10 +3,19 @@ import prisma from '../lib/prisma.js';
 import { uploadFile, deleteFile as deleteR2File } from '../lib/r2.js';
 import CustomError from '../utils/customError.js';
 
-export const createProduct = async (
-	data: { name: string; description?: string; price: number; imageUrl?: string },
-	file?: Express.Multer.File,
-) => {
+type ProductInput = {
+	name: string;
+	description?: string;
+	price: number;
+	imageUrl?: string;
+	categoryId: number;
+	quantity?: number;
+	discountPercent?: number;
+	color: string;
+	shape: string;
+};
+
+export const createProduct = async (data: ProductInput, file?: Express.Multer.File) => {
 	const product = await prisma.product.create({ data });
 
 	if (!file) return product;
@@ -43,10 +52,7 @@ export const getProductById = async (id: number) => {
 	return product;
 };
 
-export const updateProduct = async (
-	id: number,
-	data: { name?: string; description?: string; price?: number; imageUrl?: string },
-) => {
+export const updateProduct = async (id: number, data: Partial<ProductInput>) => {
 	const product = await prisma.product.findUnique({ where: { id } });
 	if (!product) throw new CustomError(404, 'Product not found.');
 	return prisma.product.update({ where: { id }, data });
@@ -89,4 +95,32 @@ export const uploadProductImage = async (id: number, file: Express.Multer.File) 
 	const imageUrl = await uploadFile(key, file.buffer, file.mimetype);
 
 	return prisma.product.update({ where: { id }, data: { imageUrl } });
+};
+
+export const likeProduct = async (productId: number, userId: number) => {
+	const product = await prisma.product.findUnique({ where: { id: productId } });
+	if (!product || !product.isActive) throw new CustomError(404, 'Product not found.');
+
+	return prisma.$transaction(async (tx) => {
+		await tx.like.create({ data: { productId, userId } });
+		return tx.product.update({
+			where: { id: productId },
+			data: { likesCount: { increment: 1 } },
+		});
+	});
+};
+
+export const unlikeProduct = async (productId: number, userId: number) => {
+	const like = await prisma.like.findUnique({
+		where: { productId_userId: { productId, userId } },
+	});
+	if (!like) throw new CustomError(404, 'Like not found.');
+
+	return prisma.$transaction(async (tx) => {
+		await tx.like.delete({ where: { id: like.id } });
+		return tx.product.update({
+			where: { id: productId },
+			data: { likesCount: { decrement: 1 } },
+		});
+	});
 };

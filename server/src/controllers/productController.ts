@@ -39,3 +39,13 @@ export const uploadProductImage = async (req: Request, res: Response) => {
 	const product = await productService.uploadProductImage(Number(req.params.id), req.file);
 	res.status(200).json({ product });
 };
+
+export const likeProduct = async (req: Request, res: Response) => {
+	const product = await productService.likeProduct(Number(req.params.id), req.user!.userId);
+	res.status(200).json({ product });
+};
+
+export const unlikeProduct = async (req: Request, res: Response) => {
+	const product = await productService.unlikeProduct(Number(req.params.id), req.user!.userId);
+	res.status(200).json({ product });
+};

@@ -34,5 +34,7 @@ router.post(
 	uploadImage.single('image'),
 	productController.uploadProductImage,
 );
+router.post('/:id/like', isAuth, productController.likeProduct);
+router.delete('/:id/like', isAuth, productController.unlikeProduct);
 
 export default router;

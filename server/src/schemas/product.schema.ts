@@ -10,6 +10,11 @@ export const createProductSchema = z.object({
 	description: z.string().min(1).optional(),
 	price: z.coerce.number().int().positive(),
 	imageUrl: z.string().url().optional(),
+	categoryId: z.coerce.number().int().positive(),
+	quantity: z.coerce.number().int().nonnegative().optional(),
+	discountPercent: z.coerce.number().int().min(0).max(100).optional(),
+	color: z.string().min(1),
+	shape: z.string().min(1),
 });
 
 export const updateProductSchema = createProductSchema
