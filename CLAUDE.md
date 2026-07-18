@@ -125,6 +125,6 @@ STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing sec
 
 **FE modernization — done.** All four auth forms (Login, Register, Forgot Password, Reset Password) run on React Hook Form + Zod, with factory-function schemas for i18n error messages. The reviewer pass over the combined CI + security-hardening + full-Docker diff is complete, and `develop` merged to `main` for that batch.
 
-**API error convention — built.** `CustomError`/`errorHandler` now carry a stable `code` (RFC 9457-style; no bare `message` reaches the client — server-side logging keeps the descriptive text). Named errors (`INVALID_CREDENTIALS`, `EMAIL_TAKEN`, `INVALID_RESET_TOKEN`) send `{ statusCode, code }`; `VALIDATION_ERROR` additionally carries `details: [{ field, message }]` since it's the one generic, unpredictable-field case. See `zod.md` for the full convention.
+**API error convention — built.** `CustomError`/`errorHandler` carry a stable `code`; no bare `message` reaches the client. See `zod.md` for the full convention (response shape, named codes, `VALIDATION_ERROR` carve-out).
 
 **Next — Stripe checkout**, per `roadmap.md`.
