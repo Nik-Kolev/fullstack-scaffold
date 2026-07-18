@@ -23,6 +23,7 @@ vi.mock('../lib/stripe.js', () => ({
 
 const TEST_USER = { email: 'pay-test@example.com', password: 'Test1234', name: 'Payer' };
 let PRODUCT_ID = 0;
+let categoryId = 0;
 const SESSION_ID = 'cs_test_abc123';
 const SESSION_URL = 'https://checkout.stripe.com/pay/cs_test_abc123';
 const CUSTOMER_ID = 'cus_test_123';
@@ -72,8 +73,10 @@ async function seedPayment(userId: number, overrides: object = {}) {
 }
 
 beforeEach(async () => {
+	await prisma.like.deleteMany();
 	await prisma.payment.deleteMany();
 	await prisma.product.deleteMany();
+	await prisma.productCategory.deleteMany();
 	await prisma.userFile.deleteMany();
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();
@@ -84,7 +87,17 @@ beforeEach(async () => {
 		id: SESSION_ID,
 		url: SESSION_URL,
 	} as any);
-	const product = await prisma.product.create({ data: { name: 'Test Product', price: 1000 } });
+	const category = await prisma.productCategory.create({ data: { name: 'Test Category' } });
+	categoryId = category.id;
+	const product = await prisma.product.create({
+		data: {
+			name: 'Test Product',
+			price: 1000,
+			categoryId,
+			color: 'black',
+			shape: 'square',
+		},
+	});
 	PRODUCT_ID = product.id;
 });
 
@@ -176,7 +189,14 @@ describe('POST /api/payment/checkout', () => {
 		it('returns 404 when product is inactive', async () => {
 			const { accessToken } = await registerAndLogin();
 			const inactive = await prisma.product.create({
-				data: { name: 'Gone', price: 500, isActive: false },
+				data: {
+					name: 'Gone',
+					price: 500,
+					isActive: false,
+					categoryId,
+					color: 'black',
+					shape: 'square',
+				},
 			});
 			const res = await checkoutReq(accessToken, { productId: inactive.id, quantity: 1 });
 			expect(res.status).toBe(404);
@@ -253,7 +273,13 @@ describe('POST /api/payment/checkout', () => {
 			const { accessToken, userId } = await registerAndLogin();
 			const existingUrl = 'https://checkout.stripe.com/pay/existing';
 			const otherProduct = await prisma.product.create({
-				data: { name: 'Other Product', price: 500 },
+				data: {
+					name: 'Other Product',
+					price: 500,
+					categoryId,
+					color: 'black',
+					shape: 'square',
+				},
 			});
 			await seedPayment(userId, { status: 'PENDING' });
 

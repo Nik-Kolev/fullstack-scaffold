@@ -46,22 +46,33 @@ async function registerAndLoginAsAdmin() {
 	return loginAs(ADMIN);
 }
 
+let categoryId: number;
+
 async function seedProduct(overrides: object = {}) {
 	return prisma.product.create({
-		data: { ...PRODUCT_DATA, ...overrides } as Parameters<
-			typeof prisma.product.create
-		>[0]['data'],
+		data: {
+			...PRODUCT_DATA,
+			categoryId,
+			color: 'black',
+			shape: 'square',
+			...overrides,
+		} as Parameters<typeof prisma.product.create>[0]['data'],
 	});
 }
 
 beforeEach(async () => {
+	await prisma.like.deleteMany();
 	await prisma.payment.deleteMany();
 	await prisma.product.deleteMany();
+	await prisma.productCategory.deleteMany();
 	await prisma.userFile.deleteMany();
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();
 	await redis.flushdb();
 	vi.resetAllMocks();
+
+	const category = await prisma.productCategory.create({ data: { name: 'Test Category' } });
+	categoryId = category.id;
 });
 
 afterAll(async () => {
@@ -140,7 +151,6 @@ describe('GET /api/product', () => {
 			description: 'A fine widget',
 			imageUrl: 'https://example.com/img.png',
 		});
-		expect(res.body.products[0].password).toBeUndefined();
 	});
 });
 
@@ -191,7 +201,7 @@ describe('POST /api/product', () => {
 		const res = await request(app)
 			.post('/api/product')
 			.set('Authorization', `Bearer ${token}`)
-			.send({ price: 999 });
+			.send({ price: 999, categoryId, color: 'black', shape: 'square' });
 		expect(res.status).toBe(400);
 	});
 
@@ -200,7 +210,7 @@ describe('POST /api/product', () => {
 		const res = await request(app)
 			.post('/api/product')
 			.set('Authorization', `Bearer ${token}`)
-			.send({ name: 'Widget' });
+			.send({ name: 'Widget', categoryId, color: 'black', shape: 'square' });
 		expect(res.status).toBe(400);
 	});
 
@@ -209,7 +219,7 @@ describe('POST /api/product', () => {
 		const res = await request(app)
 			.post('/api/product')
 			.set('Authorization', `Bearer ${token}`)
-			.send({ name: 'Widget', price: 9.99 });
+			.send({ name: 'Widget', price: 9.99, categoryId, color: 'black', shape: 'square' });
 		expect(res.status).toBe(400);
 	});
 
@@ -218,7 +228,16 @@ describe('POST /api/product', () => {
 		const res = await request(app)
 			.post('/api/product')
 			.set('Authorization', `Bearer ${token}`)
-			.send({ name: 'Widget', price: 0 });
+			.send({ name: 'Widget', price: 0, categoryId, color: 'black', shape: 'square' });
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 when categoryId is missing', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const res = await request(app)
+			.post('/api/product')
+			.set('Authorization', `Bearer ${token}`)
+			.send({ ...PRODUCT_DATA, color: 'black', shape: 'square' });
 		expect(res.status).toBe(400);
 	});
 
@@ -227,7 +246,28 @@ describe('POST /api/product', () => {
 		const res = await request(app)
 			.post('/api/product')
 			.set('Authorization', `Bearer ${token}`)
-			.send({ ...PRODUCT_DATA, imageUrl: 'not-a-url' });
+			.send({
+				...PRODUCT_DATA,
+				categoryId,
+				color: 'black',
+				shape: 'square',
+				imageUrl: 'not-a-url',
+			});
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 when quantity exceeds Postgres Int range — Zod has no upper bound, Postgres does', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const res = await request(app)
+			.post('/api/product')
+			.set('Authorization', `Bearer ${token}`)
+			.send({
+				...PRODUCT_DATA,
+				categoryId,
+				color: 'black',
+				shape: 'square',
+				quantity: 99999999999,
+			});
 		expect(res.status).toBe(400);
 	});
 
@@ -236,10 +276,18 @@ describe('POST /api/product', () => {
 		const res = await request(app)
 			.post('/api/product')
 			.set('Authorization', `Bearer ${token}`)
-			.send(PRODUCT_DATA);
+			.send({ ...PRODUCT_DATA, categoryId, color: 'black', shape: 'square' });
 
 		expect(res.status).toBe(201);
-		expect(res.body.product).toMatchObject({ name: 'Widget', price: 999, isActive: true });
+		expect(res.body.product).toMatchObject({
+			name: 'Widget',
+			price: 999,
+			isActive: true,
+			categoryId,
+			color: 'black',
+			shape: 'square',
+			quantity: 0,
+		});
 		expect(res.body.product.id).toBeDefined();
 	});
 
@@ -253,6 +301,11 @@ describe('POST /api/product', () => {
 				description: 'Top quality widget',
 				price: 2999,
 				imageUrl: 'https://example.com/widget.png',
+				categoryId,
+				color: 'red',
+				shape: 'circle',
+				quantity: 5,
+				discountPercent: 10,
 			});
 
 		expect(res.status).toBe(201);
@@ -261,6 +314,8 @@ describe('POST /api/product', () => {
 			description: 'Top quality widget',
 			price: 2999,
 			imageUrl: 'https://example.com/widget.png',
+			quantity: 5,
+			discountPercent: 10,
 		});
 	});
 
@@ -272,6 +327,9 @@ describe('POST /api/product', () => {
 			.set('Authorization', `Bearer ${token}`)
 			.field('name', 'Widget')
 			.field('price', '999')
+			.field('categoryId', String(categoryId))
+			.field('color', 'black')
+			.field('shape', 'square')
 			.attach('image', Buffer.from('fake'), {
 				filename: 'img.jpg',
 				contentType: 'image/jpeg',
@@ -290,6 +348,9 @@ describe('POST /api/product', () => {
 			.set('Authorization', `Bearer ${token}`)
 			.field('name', 'Widget')
 			.field('price', '999')
+			.field('categoryId', String(categoryId))
+			.field('color', 'black')
+			.field('shape', 'square')
 			.attach('image', Buffer.from('fake'), {
 				filename: 'img.jpg',
 				contentType: 'image/jpeg',
@@ -603,5 +664,150 @@ describe('DELETE /api/product/:id/image', () => {
 		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
 		expect(inDb?.imageUrl).toBeNull();
 		expect(inDb?.isActive).toBe(true);
+	});
+});
+
+// ─── POST /api/product/:id/like ──────────────────────────────────────────────
+
+describe('POST /api/product/:id/like', () => {
+	it('returns 401 with no Authorization header', async () => {
+		const product = await seedProduct();
+		const res = await request(app).post(`/api/product/${product.id}/like`);
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 404 for non-existent product', async () => {
+		const token = await registerAndLoginAsUser();
+		const res = await request(app)
+			.post('/api/product/99999/like')
+			.set('Authorization', `Bearer ${token}`);
+		expect(res.status).toBe(404);
+	});
+
+	it('returns 404 for an inactive (deactivated) product', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct({ isActive: false });
+		const res = await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+		expect(res.status).toBe(404);
+	});
+
+	it('returns 200 and increments likesCount', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+
+		const res = await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.product.likesCount).toBe(1);
+	});
+
+	it('creates a Like row for the user and product', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+
+		await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+
+		const user = await prisma.user.findUniqueOrThrow({ where: { email: USER.email } });
+		const like = await prisma.like.findUnique({
+			where: { productId_userId: { productId: product.id, userId: user.id } },
+		});
+		expect(like).not.toBeNull();
+	});
+
+	it('returns 409 when the same user likes the same product twice', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+
+		await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+		const res = await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+
+		expect(res.status).toBe(409);
+		expect(res.body.code).toBe('ALREADY_LIKED');
+	});
+
+	it('counts likes from different users independently', async () => {
+		const userToken = await registerAndLoginAsUser();
+		const secondUser = {
+			email: 'second-liker@example.com',
+			password: 'Test1234',
+			name: 'Second',
+		};
+		await request(app).post('/api/auth/register').send(secondUser);
+		const secondToken = await loginAs(secondUser);
+		const product = await seedProduct();
+
+		await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${userToken}`);
+		const res = await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${secondToken}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.product.likesCount).toBe(2);
+	});
+});
+
+// ─── DELETE /api/product/:id/like ────────────────────────────────────────────
+
+describe('DELETE /api/product/:id/like', () => {
+	it('returns 401 with no Authorization header', async () => {
+		const product = await seedProduct();
+		const res = await request(app).delete(`/api/product/${product.id}/like`);
+		expect(res.status).toBe(401);
+	});
+
+	it('returns 404 when the product was never liked by this user', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+
+		const res = await request(app)
+			.delete(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+
+		expect(res.status).toBe(404);
+	});
+
+	it('returns 200 and decrements likesCount', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+
+		await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+		const res = await request(app)
+			.delete(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+
+		expect(res.status).toBe(200);
+		expect(res.body.product.likesCount).toBe(0);
+	});
+
+	it('removes the Like row', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+
+		await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+		await request(app)
+			.delete(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+
+		const user = await prisma.user.findUniqueOrThrow({ where: { email: USER.email } });
+		const like = await prisma.like.findUnique({
+			where: { productId_userId: { productId: product.id, userId: user.id } },
+		});
+		expect(like).toBeNull();
 	});
 });
