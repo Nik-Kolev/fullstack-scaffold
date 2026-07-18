@@ -80,12 +80,14 @@ type GetProductsParams = {
 	maxPrice?: number | undefined;
 	color?: string | undefined;
 	shape?: string | undefined;
+	search?: string | undefined;
 	sortBy?: 'price' | 'likesCount' | undefined;
 	order: 'asc' | 'desc';
 };
 
 export const getProducts = async (params: GetProductsParams) => {
-	const { cursor, limit, categoryId, minPrice, maxPrice, color, shape, sortBy, order } = params;
+	const { cursor, limit, categoryId, minPrice, maxPrice, color, shape, search, sortBy, order } =
+		params;
 	const sortField: SortField = sortBy ?? 'createdAt';
 
 	const where: Prisma.ProductWhereInput = {
@@ -93,6 +95,7 @@ export const getProducts = async (params: GetProductsParams) => {
 		...(categoryId !== undefined && { categoryId }),
 		...(color !== undefined && { color: titleCase(color) }),
 		...(shape !== undefined && { shape: titleCase(shape) }),
+		...(search !== undefined && { name: { contains: search, mode: 'insensitive' } }),
 		...((minPrice !== undefined || maxPrice !== undefined) && {
 			price: {
 				...(minPrice !== undefined && { gte: minPrice }),

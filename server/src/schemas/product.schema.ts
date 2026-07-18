@@ -10,6 +10,7 @@ export const productQuerySchema = z.object({
 	maxPrice: z.coerce.number().int().positive().optional(),
 	color: z.string().min(1).optional(),
 	shape: z.string().min(1).optional(),
+	search: z.string().min(1).optional(),
 	sortBy: z.enum(['price', 'likesCount']).optional(),
 	order: z.enum(['asc', 'desc']).default('desc'),
 });

@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- CreateEnum
 CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'SUCCEEDED', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED');
 
@@ -115,6 +117,21 @@ CREATE UNIQUE INDEX "payments_stripe_payment_intent_id_key" ON "payments"("strip
 CREATE UNIQUE INDEX "product_categories_name_key" ON "product_categories"("name");
 
 -- CreateIndex
+CREATE INDEX "products_category_id_price_idx" ON "products"("category_id", "price");
+
+-- CreateIndex
+CREATE INDEX "products_created_at_id_idx" ON "products"("created_at", "id");
+
+-- CreateIndex
+CREATE INDEX "products_price_id_idx" ON "products"("price", "id");
+
+-- CreateIndex
+CREATE INDEX "products_likes_count_id_idx" ON "products"("likes_count", "id");
+
+-- CreateIndex
+CREATE INDEX "products_name_idx" ON "products" USING GIN ("name" gin_trgm_ops);
+
+-- CreateIndex
 CREATE UNIQUE INDEX "likes_product_id_user_id_key" ON "likes"("product_id", "user_id");
 
 -- CreateIndex
@@ -136,10 +153,10 @@ ALTER TABLE "payments" ADD CONSTRAINT "payments_user_id_fkey" FOREIGN KEY ("user
 ALTER TABLE "products" ADD CONSTRAINT "products_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "product_categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "likes" ADD CONSTRAINT "likes_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "likes" ADD CONSTRAINT "likes_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "likes" ADD CONSTRAINT "likes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "likes" ADD CONSTRAINT "likes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

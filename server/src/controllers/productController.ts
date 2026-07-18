@@ -17,6 +17,7 @@ export const getProducts = async (req: Request, res: Response) => {
 		maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
 		color: query.color,
 		shape: query.shape,
+		search: query.search,
 		sortBy: query.sortBy as 'price' | 'likesCount' | undefined,
 		order: (query.order as 'asc' | 'desc') ?? 'desc',
 	});
