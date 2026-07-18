@@ -83,14 +83,12 @@ afterAll(async () => {
 // ─── GET /api/product ────────────────────────────────────────────────────────
 
 describe('GET /api/product', () => {
-	it('returns empty result with pagination metadata when no products exist', async () => {
+	it('returns an empty result with a null nextCursor when no products exist', async () => {
 		const res = await request(app).get('/api/product');
 		expect(res.status).toBe(200);
 		expect(res.body.products).toEqual([]);
-		expect(res.body.total).toBe(0);
-		expect(res.body.page).toBe(1);
+		expect(res.body.nextCursor).toBeNull();
 		expect(res.body.limit).toBe(10);
-		expect(res.body.totalPages).toBe(0);
 	});
 
 	it('returns only active products', async () => {
@@ -101,7 +99,6 @@ describe('GET /api/product', () => {
 		const res = await request(app).get('/api/product');
 		expect(res.status).toBe(200);
 		expect(res.body.products).toHaveLength(2);
-		expect(res.body.total).toBe(2);
 		expect(res.body.products.map((p: { name: string }) => p.name)).not.toContain('Inactive');
 	});
 
@@ -110,22 +107,8 @@ describe('GET /api/product', () => {
 		expect(res.status).toBe(200);
 	});
 
-	it('respects page and limit query params', async () => {
-		await seedProduct({ name: 'P1' });
-		await seedProduct({ name: 'P2' });
-		await seedProduct({ name: 'P3' });
-
-		const res = await request(app).get('/api/product?page=2&limit=2');
-		expect(res.status).toBe(200);
-		expect(res.body.products).toHaveLength(1);
-		expect(res.body.page).toBe(2);
-		expect(res.body.limit).toBe(2);
-		expect(res.body.total).toBe(3);
-		expect(res.body.totalPages).toBe(2);
-	});
-
 	it('returns 400 for invalid query params', async () => {
-		const res = await request(app).get('/api/product?page=0');
+		const res = await request(app).get('/api/product?limit=0');
 		expect(res.status).toBe(400);
 	});
 
@@ -150,6 +133,177 @@ describe('GET /api/product', () => {
 			isActive: true,
 			description: 'A fine widget',
 			imageUrl: 'https://example.com/img.png',
+		});
+	});
+
+	describe('cursor pagination', () => {
+		it('returns a non-null nextCursor when more results exist beyond the limit', async () => {
+			await seedProduct({ name: 'P1' });
+			await seedProduct({ name: 'P2' });
+			await seedProduct({ name: 'P3' });
+
+			const res = await request(app).get('/api/product?limit=2');
+			expect(res.status).toBe(200);
+			expect(res.body.products).toHaveLength(2);
+			expect(res.body.nextCursor).not.toBeNull();
+		});
+
+		it('returns a null nextCursor on the last page', async () => {
+			await seedProduct({ name: 'P1' });
+			await seedProduct({ name: 'P2' });
+
+			const res = await request(app).get('/api/product?limit=10');
+			expect(res.status).toBe(200);
+			expect(res.body.products).toHaveLength(2);
+			expect(res.body.nextCursor).toBeNull();
+		});
+
+		it('walks through all pages via nextCursor with no overlap or gaps', async () => {
+			const created = [];
+			for (let i = 0; i < 5; i++) {
+				created.push(await seedProduct({ name: `Item ${i}` }));
+			}
+
+			const seenIds = new Set<number>();
+			let cursor: string | undefined;
+			let pages = 0;
+
+			do {
+				const res = await request(app).get(
+					`/api/product?limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+				);
+				expect(res.status).toBe(200);
+				for (const p of res.body.products as { id: number }[]) {
+					expect(seenIds.has(p.id)).toBe(false);
+					seenIds.add(p.id);
+				}
+				cursor = res.body.nextCursor;
+				pages++;
+				expect(pages).toBeLessThan(10);
+			} while (cursor);
+
+			expect(seenIds.size).toBe(5);
+			expect(created.every((p) => seenIds.has(p.id))).toBe(true);
+		});
+
+		it('returns 400 for a malformed cursor', async () => {
+			const res = await request(app).get('/api/product?cursor=not-valid-base64json');
+			expect(res.status).toBe(400);
+		});
+
+		it('returns 400 for a cursor missing an id', async () => {
+			const badCursor = Buffer.from(
+				JSON.stringify({
+					sortField: 'createdAt',
+					order: 'desc',
+					sortValue: new Date().toISOString(),
+				}),
+			).toString('base64url');
+
+			const res = await request(app).get(`/api/product?cursor=${badCursor}`);
+			expect(res.status).toBe(400);
+		});
+
+		it('returns 400 when a cursor is reused with a different sortBy/order', async () => {
+			await seedProduct({ name: 'P1', price: 1000 });
+			await seedProduct({ name: 'P2', price: 2000 });
+
+			const page1 = await request(app).get('/api/product?sortBy=price&order=asc&limit=1');
+			expect(page1.body.nextCursor).not.toBeNull();
+
+			const res = await request(app).get(
+				`/api/product?sortBy=likesCount&order=desc&limit=1&cursor=${encodeURIComponent(page1.body.nextCursor)}`,
+			);
+			expect(res.status).toBe(400);
+		});
+
+		it('does not skip or duplicate items that tie on the sort field across a page boundary', async () => {
+			const a = await seedProduct({ name: 'TieA', price: 1000 });
+			const b = await seedProduct({ name: 'TieB', price: 1000 });
+			const c = await seedProduct({ name: 'TieC', price: 1000 });
+
+			const page1 = await request(app).get('/api/product?sortBy=price&order=asc&limit=2');
+			expect(page1.status).toBe(200);
+			expect(page1.body.products).toHaveLength(2);
+			expect(page1.body.nextCursor).not.toBeNull();
+
+			const page2 = await request(app).get(
+				`/api/product?sortBy=price&order=asc&limit=2&cursor=${encodeURIComponent(page1.body.nextCursor)}`,
+			);
+			expect(page2.status).toBe(200);
+
+			const seenIds = [...page1.body.products, ...page2.body.products].map(
+				(p: { id: number }) => p.id,
+			);
+			expect(new Set(seenIds).size).toBe(3);
+			expect(seenIds.sort()).toEqual([a.id, b.id, c.id].sort());
+		});
+	});
+
+	describe('filters', () => {
+		it('filters by categoryId', async () => {
+			const otherCategory = await prisma.productCategory.create({ data: { name: 'Other' } });
+			await seedProduct({ name: 'InCategory' });
+			await seedProduct({ name: 'OtherCategory', categoryId: otherCategory.id });
+
+			const res = await request(app).get(`/api/product?categoryId=${categoryId}`);
+			expect(res.status).toBe(200);
+			expect(res.body.products.map((p: { name: string }) => p.name)).toEqual(['InCategory']);
+		});
+
+		it('filters by minPrice and maxPrice', async () => {
+			await seedProduct({ name: 'Cheap', price: 500 });
+			await seedProduct({ name: 'Mid', price: 1500 });
+			await seedProduct({ name: 'Expensive', price: 5000 });
+
+			const res = await request(app).get('/api/product?minPrice=1000&maxPrice=2000');
+			expect(res.status).toBe(200);
+			expect(res.body.products.map((p: { name: string }) => p.name)).toEqual(['Mid']);
+		});
+
+		it('filters by color and shape, case-insensitively', async () => {
+			await seedProduct({ name: 'RedSquare', color: 'Red', shape: 'Square' });
+			await seedProduct({ name: 'BlueCircle', color: 'Blue', shape: 'Circle' });
+
+			const res = await request(app).get('/api/product?color=red&shape=square');
+			expect(res.status).toBe(200);
+			expect(res.body.products.map((p: { name: string }) => p.name)).toEqual(['RedSquare']);
+		});
+	});
+
+	describe('sorting', () => {
+		it('defaults to newest first', async () => {
+			const older = await seedProduct({ name: 'Older', createdAt: new Date('2024-01-01') });
+			const newer = await seedProduct({ name: 'Newer', createdAt: new Date('2024-06-01') });
+
+			const res = await request(app).get('/api/product');
+			expect(res.status).toBe(200);
+			expect(res.body.products[0].id).toBe(newer.id);
+			expect(res.body.products[1].id).toBe(older.id);
+		});
+
+		it('sorts by price ascending', async () => {
+			await seedProduct({ name: 'Expensive', price: 5000 });
+			await seedProduct({ name: 'Cheap', price: 500 });
+
+			const res = await request(app).get('/api/product?sortBy=price&order=asc');
+			expect(res.status).toBe(200);
+			expect(res.body.products.map((p: { name: string }) => p.name)).toEqual([
+				'Cheap',
+				'Expensive',
+			]);
+		});
+
+		it('sorts by likesCount descending', async () => {
+			const lessLiked = await seedProduct({ name: 'LessLiked', likesCount: 1 });
+			const moreLiked = await seedProduct({ name: 'MoreLiked', likesCount: 5 });
+
+			const res = await request(app).get('/api/product?sortBy=likesCount&order=desc');
+			expect(res.status).toBe(200);
+			expect(res.body.products.map((p: { id: number }) => p.id)).toEqual([
+				moreLiked.id,
+				lessLiked.id,
+			]);
 		});
 	});
 });
@@ -284,11 +438,23 @@ describe('POST /api/product', () => {
 			price: 999,
 			isActive: true,
 			categoryId,
-			color: 'black',
-			shape: 'square',
+			color: 'Black',
+			shape: 'Square',
 			quantity: 0,
 		});
 		expect(res.body.product.id).toBeDefined();
+	});
+
+	it('normalizes color and shape to title case regardless of input casing', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const res = await request(app)
+			.post('/api/product')
+			.set('Authorization', `Bearer ${token}`)
+			.send({ ...PRODUCT_DATA, categoryId, color: 'bLACK', shape: 'SQUARE' });
+
+		expect(res.status).toBe(201);
+		expect(res.body.product.color).toBe('Black');
+		expect(res.body.product.shape).toBe('Square');
 	});
 
 	it('returns 201 with all optional fields', async () => {
