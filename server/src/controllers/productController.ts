@@ -8,9 +8,18 @@ export const createProduct = async (req: Request, res: Response) => {
 };
 
 export const getProducts = async (req: Request, res: Response) => {
-	const page = Number(req.query.page ?? 1);
-	const limit = Number(req.query.limit ?? 10);
-	const result = await productService.getProducts(page, limit);
+	const query = req.query as Record<string, string | undefined>;
+	const result = await productService.getProducts({
+		cursor: query.cursor,
+		limit: Number(query.limit ?? 10),
+		categoryId: query.categoryId ? Number(query.categoryId) : undefined,
+		minPrice: query.minPrice ? Number(query.minPrice) : undefined,
+		maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
+		color: query.color,
+		shape: query.shape,
+		sortBy: query.sortBy as 'price' | 'likesCount' | undefined,
+		order: (query.order as 'asc' | 'desc') ?? 'desc',
+	});
 	res.status(200).json(result);
 };
 

@@ -24,6 +24,10 @@ model Product {
     likesCount      Int      @default(0) @map("likes_count")
     likes           Like[]
 
+    @@index([categoryId, price])
+    @@index([createdAt, id])
+    @@index([price, id])
+    @@index([likesCount, id])
     @@map("products")
 }
 

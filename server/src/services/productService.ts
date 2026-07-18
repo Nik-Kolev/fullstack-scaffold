@@ -2,6 +2,47 @@ import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
 import { uploadFile, deleteFile as deleteR2File } from '../lib/r2.js';
 import CustomError from '../utils/customError.js';
+import { titleCase } from '../schemas/product.schema.js';
+import type { Prisma } from '../generated/prisma/index.js';
+
+type SortField = 'createdAt' | 'price' | 'likesCount';
+
+function encodeCursor(
+	sortField: SortField,
+	order: 'asc' | 'desc',
+	sortValue: Date | number,
+	id: number,
+): string {
+	const serializable = sortValue instanceof Date ? sortValue.toISOString() : sortValue;
+	return Buffer.from(JSON.stringify({ sortField, order, sortValue: serializable, id })).toString(
+		'base64url',
+	);
+}
+
+// A cursor from a different sortField/order would otherwise be silently misinterpreted
+// rather than rejected — comparing the embedded values here turns that into a 400.
+function decodeCursor(
+	cursor: string,
+	sortField: SortField,
+	order: 'asc' | 'desc',
+): { sortValue: Date | number; id: number } {
+	try {
+		const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf-8'));
+		if (parsed.sortField !== sortField || parsed.order !== order) throw new Error();
+
+		const sortValue =
+			sortField === 'createdAt' ? new Date(parsed.sortValue) : Number(parsed.sortValue);
+		if (sortField === 'createdAt' && isNaN((sortValue as Date).getTime())) throw new Error();
+		if (sortField !== 'createdAt' && isNaN(sortValue as number)) throw new Error();
+
+		const id = Number(parsed.id);
+		if (isNaN(id)) throw new Error();
+
+		return { sortValue, id };
+	} catch {
+		throw new CustomError(400, 'Invalid cursor.');
+	}
+}
 
 type ProductInput = {
 	name: string;
@@ -31,19 +72,58 @@ export const createProduct = async (data: ProductInput, file?: Express.Multer.Fi
 	}
 };
 
-export const getProducts = async (page: number, limit: number) => {
-	const skip = (page - 1) * limit;
-	const [products, total] = await prisma.$transaction([
-		prisma.product.findMany({
-			where: { isActive: true },
-			orderBy: { createdAt: 'desc' },
-			skip,
-			take: limit,
-		}),
-		prisma.product.count({ where: { isActive: true } }),
-	]);
+type GetProductsParams = {
+	cursor?: string | undefined;
+	limit: number;
+	categoryId?: number | undefined;
+	minPrice?: number | undefined;
+	maxPrice?: number | undefined;
+	color?: string | undefined;
+	shape?: string | undefined;
+	sortBy?: 'price' | 'likesCount' | undefined;
+	order: 'asc' | 'desc';
+};
 
-	return { products, total, page, limit, totalPages: Math.ceil(total / limit) };
+export const getProducts = async (params: GetProductsParams) => {
+	const { cursor, limit, categoryId, minPrice, maxPrice, color, shape, sortBy, order } = params;
+	const sortField: SortField = sortBy ?? 'createdAt';
+
+	const where: Prisma.ProductWhereInput = {
+		isActive: true,
+		...(categoryId !== undefined && { categoryId }),
+		...(color !== undefined && { color: titleCase(color) }),
+		...(shape !== undefined && { shape: titleCase(shape) }),
+		...((minPrice !== undefined || maxPrice !== undefined) && {
+			price: {
+				...(minPrice !== undefined && { gte: minPrice }),
+				...(maxPrice !== undefined && { lte: maxPrice }),
+			},
+		}),
+	};
+
+	if (cursor) {
+		const { sortValue, id } = decodeCursor(cursor, sortField, order);
+		const cmp = order === 'asc' ? 'gt' : 'lt';
+		where.OR = [
+			{ [sortField]: { [cmp]: sortValue } },
+			{ [sortField]: sortValue, id: { [cmp]: id } },
+		];
+	}
+
+	const products = await prisma.product.findMany({
+		where,
+		orderBy: [{ [sortField]: order }, { id: order }],
+		take: limit + 1,
+	});
+
+	let nextCursor: string | null = null;
+	if (products.length > limit) {
+		products.pop();
+		const last = products[products.length - 1]!;
+		nextCursor = encodeCursor(sortField, order, last[sortField], last.id);
+	}
+
+	return { products, nextCursor, limit };
 };
 
 export const getProductById = async (id: number) => {

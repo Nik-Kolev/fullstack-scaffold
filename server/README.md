@@ -136,33 +136,36 @@ prisma/
 
 ## API Endpoints
 
-| Method & Path                | Auth     | Description                                                                       |
-| ---------------------------- | -------- | --------------------------------------------------------------------------------- |
-| `POST /auth/register`        | —        | Create account, send welcome email                                                |
-| `POST /auth/login`           | —        | Issue access + refresh tokens                                                     |
-| `POST /auth/logout`          | —        | Revoke refresh token, clear cookie                                                |
-| `POST /auth/refresh`         | cookie   | Rotate refresh token, issue new access token                                      |
-| `GET /auth/google`           | —        | Start Google OAuth flow                                                           |
-| `GET /auth/google/callback`  | —        | Google OAuth callback, upsert by `googleId`                                       |
-| `POST /auth/change-password` | required | Change password; invalidates other sessions                                       |
-| `POST /auth/forgot-password` | —        | Always 200; emails a reset link if user exists                                    |
-| `POST /auth/reset-password`  | —        | Reset password via emailed token                                                  |
-| `GET /user/me`               | required | Fetch the authenticated user's profile                                            |
-| `PATCH /user/me`             | required | Update own name or email                                                          |
-| `GET /user/:id`              | —        | Fetch a user by ID                                                                |
-| `POST /upload`               | required | Upload up to 10 files to a folder                                                 |
-| `DELETE /upload/:key`        | required | Delete a file (`key` must be URL-encoded)                                         |
-| `GET /upload/folder/:name`   | required | List all files in a named folder                                                  |
-| `GET /upload/folders`        | required | List all distinct folder names for the user                                       |
-| `POST /payment/checkout`     | required | Create Stripe Checkout session; body `{ productId, quantity }`, returns `{ url }` |
-| `POST /payment/webhook`      | —        | Stripe webhook — updates payment status on checkout/charge events                 |
-| `GET /product`               | —        | List active products; supports `?page=&limit=` (defaults 1/10)                    |
-| `GET /product/:id`           | —        | Get a single product by ID (includes inactive)                                    |
-| `POST /product`              | admin    | Create a product; multipart `{ name, price, description? }` + optional `image`    |
-| `PUT /product/:id`           | admin    | Update a product (partial — at least one field required)                          |
-| `DELETE /product/:id`        | admin    | Soft-delete a product (`isActive = false`), deletes R2 image                      |
-| `POST /product/:id/image`    | admin    | Replace product image; deletes old R2 object first                                |
-| `DELETE /product/:id/image`  | admin    | Remove product image without deactivating                                         |
+| Method & Path                | Auth     | Description                                                                                                                                      |
+| ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /auth/register`        | —        | Create account, send welcome email                                                                                                               |
+| `POST /auth/login`           | —        | Issue access + refresh tokens                                                                                                                    |
+| `POST /auth/logout`          | —        | Revoke refresh token, clear cookie                                                                                                               |
+| `POST /auth/refresh`         | cookie   | Rotate refresh token, issue new access token                                                                                                     |
+| `GET /auth/google`           | —        | Start Google OAuth flow                                                                                                                          |
+| `GET /auth/google/callback`  | —        | Google OAuth callback, upsert by `googleId`                                                                                                      |
+| `POST /auth/change-password` | required | Change password; invalidates other sessions                                                                                                      |
+| `POST /auth/forgot-password` | —        | Always 200; emails a reset link if user exists                                                                                                   |
+| `POST /auth/reset-password`  | —        | Reset password via emailed token                                                                                                                 |
+| `GET /user/me`               | required | Fetch the authenticated user's profile                                                                                                           |
+| `PATCH /user/me`             | required | Update own name or email                                                                                                                         |
+| `GET /user/:id`              | —        | Fetch a user by ID                                                                                                                               |
+| `POST /upload`               | required | Upload up to 10 files to a folder                                                                                                                |
+| `DELETE /upload/:key`        | required | Delete a file (`key` must be URL-encoded)                                                                                                        |
+| `GET /upload/folder/:name`   | required | List all files in a named folder                                                                                                                 |
+| `GET /upload/folders`        | required | List all distinct folder names for the user                                                                                                      |
+| `POST /payment/checkout`     | required | Create Stripe Checkout session; body `{ productId, quantity }`, returns `{ url }`                                                                |
+| `POST /payment/webhook`      | —        | Stripe webhook — updates payment status on checkout/charge events                                                                                |
+| `GET /product`               | —        | List active products — cursor pagination, see Products below                                                                                     |
+| `GET /product/:id`           | —        | Get a single product by ID (includes inactive)                                                                                                   |
+| `POST /product`              | admin    | Create a product; multipart `{ name, price, categoryId, color, shape, description?, quantity?, discountPercent?, imageUrl? }` + optional `image` |
+| `PUT /product/:id`           | admin    | Update a product (partial — at least one field required)                                                                                         |
+| `DELETE /product/:id`        | admin    | Soft-delete a product (`isActive = false`), deletes R2 image                                                                                     |
+| `POST /product/:id/image`    | admin    | Replace product image; deletes old R2 object first                                                                                               |
+| `DELETE /product/:id/image`  | admin    | Remove product image without deactivating                                                                                                        |
+| `POST /product/:id/like`     | required | Like a product (any logged-in user); 409 `ALREADY_LIKED` on duplicate                                                                            |
+| `DELETE /product/:id/like`   | required | Remove your like from a product                                                                                                                  |
+| `GET /category`              | —        | List all product categories, sorted by name                                                                                                      |
 
 ## Frontend Integration Notes
 
@@ -172,13 +175,22 @@ Key contracts to know when writing frontend service calls:
 
 Every error response is `{ statusCode, code, details }` — no `message` field. `code` is the stable, machine-readable value to dispatch UI copy off (never display raw server text — see `zod.md`'s client rules). `details` is only ever populated for `VALIDATION_ERROR` (a `[{ field, message }]` array); every other code sends `details: undefined` since the code alone already implies which field/flow is affected.
 
-Named codes in use so far: `VALIDATION_ERROR` (any Zod shape mismatch, all routes), `INVALID_CREDENTIALS` (login), `EMAIL_TAKEN` (register), `INVALID_RESET_TOKEN` (reset-password). Routes without a named code yet (e.g. change-password) still return `{ statusCode }` with `code: undefined` — fall back to a generic message for those.
+Named codes in use so far: `VALIDATION_ERROR` (any Zod shape mismatch, all routes), `INVALID_CREDENTIALS` (login), `EMAIL_TAKEN` (register), `INVALID_RESET_TOKEN` (reset-password), `ALREADY_LIKED` (`POST /product/:id/like` on a duplicate). Routes without a named code yet (e.g. change-password) still return `{ statusCode }` with `code: undefined` — fall back to a generic message for those.
 
 ### Auth
 
 - `GET /user/me` → `{ user }` — includes `hasPassword: boolean` (computed). Use this, not `googleId`, to decide whether to show the current-password field on the change-password form. A Google user who has since set a password will have both `googleId` set and `hasPassword: true`.
 - `POST /auth/change-password` → `{ user, accessToken, message }` — replace the stored access token and cached user object on success. All other sessions are invalidated server-side.
 - `POST /auth/reset-password` → `{ user, accessToken }` — user is logged in immediately after reset.
+
+### Products
+
+`GET /product` uses **cursor pagination**, not page numbers — there is no `page`/`total`/`totalPages` in the response, and no way to jump to an arbitrary page. Build a "Load more" UI, not a numbered page picker.
+
+- Query params: `limit` (default 10, max 100), `cursor` (opaque, see below), `categoryId`, `minPrice`, `maxPrice`, `color`, `shape` (all optional filters), `sortBy` (`'price' | 'likesCount'`, omit for newest-first), `order` (`'asc' | 'desc'`, default `'desc'`).
+- Response: `{ products, nextCursor, limit }`. `nextCursor` is `null` on the last page.
+- To fetch the next page, send the previous response's `nextCursor` back verbatim as the `cursor` param, **with the same `sortBy`/`order`** — a cursor carries the sort it was generated under and returns 400 if reused with a different one. Treat `cursor` as an opaque string; never construct or parse it client-side, its internal shape can change without notice.
+- `color`/`shape` are stored title-cased (`"black"` → `"Black"`) regardless of input casing — filtering by either casing works, no need to normalize before sending.
 
 ### Payments
 
@@ -280,7 +292,7 @@ Run `npm run db:seed` (or it runs automatically after `db:fresh`) to populate th
 | `test@abv.bg`  | `password` | `user`  |
 | `admin@abv.bg` | `password` | `admin` |
 
-The seed is idempotent — safe to run multiple times. It also seeds two products (`Basic Plan` at €9.99 and `Pro Plan` at €29.99) if no products exist yet.
+The seed is idempotent — safe to run multiple times. It also seeds two categories (`Electronics`, `Books`) and two products (`Wireless Bluetooth Headphones` at €79.99, `The Pragmatic Programmer` at €34.99) if no products exist yet.
 
 > Add your own admin user to `prisma/seed.ts` before running in a new environment.
 
