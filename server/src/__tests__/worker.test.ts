@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
 import { emailQueue } from '../lib/bullmq.js';
 import emailWorker, { handleEmailJob } from '../workers/email.worker.js';
-import { Job, QueueEvents } from 'bullmq';
+import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { redisConnectionOptions } from '../lib/redis.js';
 import { sendEmail } from '../lib/resend.js';
 
@@ -15,6 +15,13 @@ vi.mock('@react-email/render', () => ({
 
 const queueEvents = new QueueEvents('emails', { connection: redisConnectionOptions });
 
+// Own queue/worker, not the shared 'emails' one — other files (e.g. auth.test.ts) enqueue real jobs there.
+const e2eQueue = new Queue('emails-e2e-test', { connection: redisConnectionOptions });
+const e2eWorker = new Worker('emails-e2e-test', handleEmailJob, {
+	connection: redisConnectionOptions,
+});
+const e2eQueueEvents = new QueueEvents('emails-e2e-test', { connection: redisConnectionOptions });
+
 describe('email worker', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -25,6 +32,10 @@ describe('email worker', () => {
 		await queueEvents.close();
 		await emailQueue.obliterate({ force: true });
 		await emailQueue.close();
+		await e2eWorker.close();
+		await e2eQueueEvents.close();
+		await e2eQueue.obliterate({ force: true });
+		await e2eQueue.close();
 	});
 
 	it('handles a welcome job', async () => {
@@ -70,7 +81,7 @@ describe('email worker', () => {
 	});
 
 	it('completes a welcome job end to end', async () => {
-		const job = await emailQueue.add('welcome', { name: 'Test', email: 'test@example.com' });
-		await expect(job.waitUntilFinished(queueEvents)).resolves.not.toThrow();
+		const job = await e2eQueue.add('welcome', { name: 'Test', email: 'test@example.com' });
+		await expect(job.waitUntilFinished(e2eQueueEvents)).resolves.not.toThrow();
 	});
 });
