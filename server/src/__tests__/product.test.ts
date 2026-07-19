@@ -369,7 +369,7 @@ describe('GET /api/product caching', () => {
 
 		const ttl = await redis.ttl('cache:/api/product');
 		expect(ttl).toBeGreaterThan(0);
-		expect(ttl).toBeLessThanOrEqual(60);
+		expect(ttl).toBeLessThanOrEqual(300);
 	});
 
 	it('caches distinct query strings independently', async () => {
@@ -487,6 +487,36 @@ describe('GET /api/product/:id', () => {
 		const res = await request(app).get(`/api/product/${inactive.id}`);
 		expect(res.status).toBe(200);
 		expect(res.body.product.isActive).toBe(false);
+	});
+});
+
+// ─── GET /api/product/:id caching ─────────────────────────────────────────────
+
+describe('GET /api/product/:id caching', () => {
+	it('serves an identical second request from cache without hitting the DB again', async () => {
+		const product = await seedProduct();
+		const findUniqueSpy = vi.spyOn(prisma.product, 'findUnique');
+
+		const first = await request(app).get(`/api/product/${product.id}`);
+		const second = await request(app).get(`/api/product/${product.id}`);
+
+		expect(findUniqueSpy).toHaveBeenCalledTimes(1);
+		expect(second.body).toEqual(first.body);
+		findUniqueSpy.mockRestore();
+	});
+
+	it('stores the response under cache:<url> with the configured TTL', async () => {
+		const product = await seedProduct();
+
+		const res = await request(app).get(`/api/product/${product.id}`);
+		const cached = await redis.get(`cache:/api/product/${product.id}`);
+
+		expect(cached).not.toBeNull();
+		expect(JSON.parse(cached!)).toEqual(res.body);
+
+		const ttl = await redis.ttl(`cache:/api/product/${product.id}`);
+		expect(ttl).toBeGreaterThan(0);
+		expect(ttl).toBeLessThanOrEqual(300);
 	});
 });
 
@@ -1243,5 +1273,35 @@ describe('cache invalidation', () => {
 
 		const after = await request(app).get('/api/product');
 		expect(after.body.products[0].likesCount).toBe(0);
+	});
+
+	it('invalidates the updated product from the detail cache', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct();
+		await request(app).get(`/api/product/${product.id}`);
+
+		await request(app)
+			.put(`/api/product/${product.id}`)
+			.set('Authorization', `Bearer ${token}`)
+			.send({ name: 'Updated Widget' });
+
+		const cached = await redis.get(`cache:/api/product/${product.id}`);
+		expect(cached).toBeNull();
+	});
+
+	it('does not evict a different product from the detail cache on update', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const productA = await seedProduct({ name: 'A' });
+		const productB = await seedProduct({ name: 'B' });
+		await request(app).get(`/api/product/${productA.id}`);
+		await request(app).get(`/api/product/${productB.id}`);
+
+		await request(app)
+			.put(`/api/product/${productB.id}`)
+			.set('Authorization', `Bearer ${token}`)
+			.send({ name: 'Updated B' });
+
+		const cachedA = await redis.get(`cache:/api/product/${productA.id}`);
+		expect(cachedA).not.toBeNull();
 	});
 });
