@@ -1,3 +1,6 @@
+-- pg_trgm enabled inline here (not its own migration) because this schema is
+-- currently squashed to one init migration via db-fresh; split into an earlier,
+-- separate migration once real migration history starts (see prisma.md).
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- CreateEnum

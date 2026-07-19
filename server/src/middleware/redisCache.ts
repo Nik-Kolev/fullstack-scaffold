@@ -4,7 +4,8 @@ import redis from '../lib/redis.js';
 
 const LOCK_TTL_MS = 5000;
 const POLL_INTERVAL_MS = 50;
-const POLL_CEILING_MS = 2000;
+// Must stay >= LOCK_TTL_MS, else losers fall through to an unprotected DB hit while the lock is still valid.
+const POLL_CEILING_MS = LOCK_TTL_MS + POLL_INTERVAL_MS;
 
 // Atomic "delete only if the token still matches" — a plain GET+compare+DEL
 // isn't atomic and could delete a different holder's lock after our own expired.

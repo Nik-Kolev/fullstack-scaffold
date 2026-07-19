@@ -26,6 +26,11 @@ execSync('prisma migrate dev --name init --create-only', { stdio: 'inherit' });
 const initFolder = readdirSync(migrationsDir).find((entry) => entry !== 'migration_lock.toml');
 const migrationPath = `${migrationsDir}/${initFolder}/migration.sql`;
 const sql = readFileSync(migrationPath, 'utf-8');
-writeFileSync(migrationPath, `CREATE EXTENSION IF NOT EXISTS pg_trgm;\n\n${sql}`);
+const PG_TRGM_HEADER =
+	'-- pg_trgm enabled inline here (not its own migration) because this schema is\n' +
+	'-- currently squashed to one init migration via db-fresh; split into an earlier,\n' +
+	'-- separate migration once real migration history starts (see prisma.md).\n' +
+	'CREATE EXTENSION IF NOT EXISTS pg_trgm;\n\n';
+writeFileSync(migrationPath, `${PG_TRGM_HEADER}${sql}`);
 
 execSync('prisma migrate dev', { stdio: 'inherit' });

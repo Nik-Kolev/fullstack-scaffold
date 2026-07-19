@@ -12,20 +12,20 @@ const redis = new Redis(process.env.REDIS_URL);
 
 export default redis;
 
-export async function invalidateCache(pattern: string) {
-	const keys = await redis.keys(`cache:${pattern}*`);
-	if (keys.length) await redis.del(...keys);
-	// Read by redisCache's writeIfStillFresh guard — lets a request that
-	// started before this invalidation skip re-caching now-stale data.
-	await redis.set('cache:invalidated-at', Date.now());
+async function scanKeys(pattern: string): Promise<string[]> {
+	const found: string[] = [];
+	let cursor = '0';
+	do {
+		const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+		found.push(...batch);
+		cursor = nextCursor;
+	} while (cursor !== '0');
+	return found;
 }
 
-// `invalidateCache('/api/product')` would also match `/api/product/42` via
-// its trailing wildcard — these two split "list" (bare path + `?query`
-// variants) from "one specific id" (exact key only) so editing one product
-// doesn't evict every other product's cached detail page.
+// A bare wildcard here would also match `cache:/api/product/42` — split list vs. single-id invalidation so editing one product doesn't evict every other product's cached detail page.
 export async function invalidateListCache(basePath: string) {
-	const queryVariants = await redis.keys(`cache:${basePath}\\?*`);
+	const queryVariants = await scanKeys(`cache:${basePath}\\?*`);
 	await redis.del(`cache:${basePath}`, ...queryVariants);
 	await redis.set('cache:invalidated-at', Date.now());
 }
