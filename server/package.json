@@ -21,6 +21,7 @@
 		"db:reset": "prisma migrate reset",
 		"db:fresh": "node scripts/db-fresh.mjs && dotenv -e .env.test -- prisma migrate reset --force && npm run db:seed",
 		"db:seed": "prisma db seed",
+		"db:seed:bulk": "tsx --env-file-if-exists .env scripts/seed-bulk.ts",
 		"db:studio": "prisma studio",
 		"create-admin": "tsx --env-file-if-exists .env scripts/create-admin.ts",
 		"test": "vitest run",

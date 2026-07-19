@@ -343,6 +343,20 @@ npm run db:fresh
 
 Wipes migration history, drops and recreates both the dev and test DBs, creates a single fresh `init` migration, then seeds. Only use this before others are working on the project — after that always use `db:migrate`.
 
+## Performance Notes
+
+`GET /product` and `GET /product/:id` are Redis-cached (5 min TTL, stampede-protected — see `middleware/redisCache.ts`). Load-tested with k6 (`loadtest/product-stress.js`) against ~400k seeded products (`npm run db:seed:bulk`), ramping to 300 concurrent users:
+
+```bash
+npm run db:fresh && npm run db:seed:bulk && npm run dev
+k6 run -e BASE_URL=http://localhost:8080/api loadtest/product-stress.js
+```
+
+- `color`/`shape` filters are intentionally left unindexed — existing sort indexes already keep these queries fast (confirmed via `EXPLAIN ANALYZE`: `Index Scan`, never `Seq Scan`, at any limit this API allows).
+- `GET /product/:id` had no caching before this unit; adding it cut repeated-hit latency from ~650ms to ~30ms.
+- Postgres was never the bottleneck — connections stayed well under the configured limit throughout.
+- Tests were run on a single machine also running the app itself — take absolute numbers with a grain of salt; the relative improvement is what's proven, not a production capacity ceiling.
+
 ## Deployment Notes
 
 - Set `NODE_ENV=production` — gates the `secure` flag on the refresh token cookie (required for HTTPS) and the CSP `upgrade-insecure-requests` directive (force-redirects `http://` → `https://`, which breaks local dev)
