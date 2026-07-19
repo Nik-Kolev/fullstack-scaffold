@@ -12,7 +12,7 @@ export const uploadFiles = async (req: Request, res: Response) => {
 
 	const fileData = await uploadService.uploadFiles(req.user!.userId, folderName, files);
 
-	res.status(200).json({ fileData });
+	res.status(201).json({ fileData });
 };
 
 export const deleteFile = async (req: Request, res: Response) => {

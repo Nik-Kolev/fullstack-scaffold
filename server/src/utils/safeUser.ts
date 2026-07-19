@@ -7,14 +7,7 @@ export type SafeUser = {
 	createdAt: Date;
 };
 
-export const toSafeUser = (user: {
-	id: number;
-	name: string;
-	email: string;
-	role: string;
-	hasPassword: boolean;
-	createdAt: Date;
-}): SafeUser => ({
+export const toSafeUser = (user: SafeUser): SafeUser => ({
 	id: user.id,
 	name: user.name,
 	email: user.email,

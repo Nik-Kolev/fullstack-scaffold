@@ -8,6 +8,5 @@ const router = Router();
 
 router.get('/me', isAuth, userController.getMe);
 router.patch('/me', isAuth, validateBody(userSchemas.updateMeSchema), userController.updateMe);
-router.get('/:id', userController.getUser);
 
 export default router;

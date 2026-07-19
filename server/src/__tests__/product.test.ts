@@ -27,6 +27,8 @@ const mockDeleteFile = vi.mocked(deleteFile);
 const USER = { email: 'product-user@example.com', password: 'Test1234', name: 'User' };
 const ADMIN = { email: 'product-admin@example.com', password: 'Test1234', name: 'Admin' };
 const PRODUCT_DATA = { name: 'Widget', price: 999 };
+// Real JPEG signature — productService.ts now verifies content against the declared mimetype.
+const JPEG_BUFFER = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
 
 async function loginAs(credentials: { email: string; password: string }) {
 	const res = await request(app)
@@ -683,7 +685,7 @@ describe('POST /api/product', () => {
 			.field('categoryId', String(categoryId))
 			.field('color', 'black')
 			.field('shape', 'square')
-			.attach('image', Buffer.from('fake'), {
+			.attach('image', JPEG_BUFFER, {
 				filename: 'img.jpg',
 				contentType: 'image/jpeg',
 			});
@@ -704,7 +706,7 @@ describe('POST /api/product', () => {
 			.field('categoryId', String(categoryId))
 			.field('color', 'black')
 			.field('shape', 'square')
-			.attach('image', Buffer.from('fake'), {
+			.attach('image', JPEG_BUFFER, {
 				filename: 'img.jpg',
 				contentType: 'image/jpeg',
 			});
@@ -908,7 +910,7 @@ describe('POST /api/product/:id/image', () => {
 		const res = await request(app)
 			.post(`/api/product/${product.id}/image`)
 			.set('Authorization', `Bearer ${token}`)
-			.attach('image', Buffer.from('fake'), {
+			.attach('image', JPEG_BUFFER, {
 				filename: 'test.jpg',
 				contentType: 'image/jpeg',
 			});
@@ -930,7 +932,7 @@ describe('POST /api/product/:id/image', () => {
 		await request(app)
 			.post(`/api/product/${product.id}/image`)
 			.set('Authorization', `Bearer ${token}`)
-			.attach('image', Buffer.from('fake'), {
+			.attach('image', JPEG_BUFFER, {
 				filename: 'new.jpg',
 				contentType: 'image/jpeg',
 			});
@@ -951,7 +953,7 @@ describe('POST /api/product/:id/image', () => {
 		const res = await request(app)
 			.post(`/api/product/${product.id}/image`)
 			.set('Authorization', `Bearer ${token}`)
-			.attach('image', Buffer.from('fake'), {
+			.attach('image', JPEG_BUFFER, {
 				filename: 'new.jpg',
 				contentType: 'image/jpeg',
 			});
@@ -1219,7 +1221,7 @@ describe('cache invalidation', () => {
 		await request(app)
 			.post(`/api/product/${product.id}/image`)
 			.set('Authorization', `Bearer ${token}`)
-			.attach('image', Buffer.from('fake'), {
+			.attach('image', JPEG_BUFFER, {
 				filename: 'test.jpg',
 				contentType: 'image/jpeg',
 			});

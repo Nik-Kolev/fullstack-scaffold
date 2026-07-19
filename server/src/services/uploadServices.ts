@@ -2,12 +2,15 @@ import type { Prisma } from '../generated/prisma/index.js';
 import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
 import { uploadFile, deleteFile as deleteR2File } from '../lib/r2.js';
+import { assertMatchesDeclaredType, extensionForMimeType } from '../utils/fileValidation.js';
 import CustomError from '../utils/customError.js';
 
 export const uploadFiles = async (userId: number, folder: string, data: Express.Multer.File[]) => {
-	const fileData: Prisma.UserFileCreateManyInput[] = await Promise.all(
+	const results = await Promise.allSettled(
 		data.map(async (file) => {
-			const ext = file.originalname.split('.').pop();
+			assertMatchesDeclaredType(file);
+
+			const ext = extensionForMimeType(file.mimetype);
 			const key = `${userId}/${folder}/${crypto.randomUUID()}.${ext}`;
 			const url = await uploadFile(key, file.buffer, file.mimetype);
 
@@ -19,10 +22,31 @@ export const uploadFiles = async (userId: number, folder: string, data: Express.
 				size: file.size,
 				folder,
 				mimeType: file.mimetype,
-			};
+			} satisfies Prisma.UserFileCreateManyInput;
 		}),
 	);
 
+	const succeeded = results.filter(
+		(r): r is PromiseFulfilledResult<Prisma.UserFileCreateManyInput> =>
+			r.status === 'fulfilled',
+	);
+	const failed = results.find((r) => r.status === 'rejected') as
+		| PromiseRejectedResult
+		| undefined;
+
+	if (failed) {
+		// Roll back whatever already made it to R2 so a partial failure doesn't leave orphaned files.
+		await Promise.all(
+			succeeded.map((r) =>
+				deleteR2File(r.value.key).catch((err) => {
+					console.error(`Failed to roll back orphaned upload ${r.value.key}:`, err);
+				}),
+			),
+		);
+		throw failed.reason;
+	}
+
+	const fileData = succeeded.map((r) => r.value);
 	await prisma.userFile.createMany({
 		data: fileData,
 	});

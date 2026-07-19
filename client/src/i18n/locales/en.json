@@ -17,14 +17,12 @@
     "newPassword": "New password"
   },
   "nav": {
-    "logoAlt": "Scaffold logo",
     "home": "Home",
     "terms": "Terms",
     "privacy": "Privacy",
     "cookies": "Cookies"
   },
   "footer": {
-    "tagline": "A clean fullstack scaffold.",
     "description": "A modern fullstack starter built with Express, Prisma, React, and Tailwind. Copy, customise, and ship.",
     "columns": {
       "pages": "Pages",
@@ -33,7 +31,6 @@
     },
     "links": {
       "home": "Home",
-      "github": "GitHub",
       "contact": "Contact",
       "about": "About",
       "terms": "Terms of Service",
@@ -103,6 +100,9 @@
     "invalidCredentials": "The email address or password you entered is incorrect. Please try again.",
     "emailTaken": "An account with this email address already exists.",
     "generic": "Something went wrong. Please try again.",
+    "popupBlocked": "Popup was blocked. Please allow popups for this site and try again.",
+    "googleSignInFailed": "Google sign-in failed. Please try again.",
+    "invalidOAuthCallback": "Invalid OAuth callback.",
     "boundary": {
       "title": "Something went wrong",
       "message": "An unexpected error occurred. Please return home.",

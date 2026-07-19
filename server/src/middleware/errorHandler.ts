@@ -50,7 +50,12 @@ function mapUniqueConstraintError(meta: unknown) {
 	return UNIQUE_CONSTRAINT_CODES[fields.map(String).sort().join(',')];
 }
 
-function errorHandler(error: unknown, req: Request, res: Response, _next: NextFunction): void {
+export function errorHandler(
+	error: unknown,
+	req: Request,
+	res: Response,
+	_next: NextFunction,
+): void {
 	let message = 'Internal server error';
 	let statusCode = 500;
 	let code: string | undefined;
@@ -95,5 +100,3 @@ function errorHandler(error: unknown, req: Request, res: Response, _next: NextFu
 
 	res.status(statusCode).json({ statusCode, code, details });
 }
-
-export default errorHandler;

@@ -70,6 +70,7 @@ export default function Navbar() {
         <div className="col-start-3 flex items-center justify-end gap-3">
           <button
             onClick={toggleLang}
+            data-testid="lang-toggle"
             aria-label={isEnglish ? 'Switch to Bulgarian' : 'Switch to English'}
             className="text-muted-foreground hover:text-foreground w-8 text-sm font-medium transition-colors"
           >

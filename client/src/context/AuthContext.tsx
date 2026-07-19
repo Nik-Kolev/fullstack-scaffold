@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { clearAccessToken, setAccessToken } from '@/lib/axios'
 import * as authService from '@/services/auth'
@@ -42,6 +43,7 @@ function clearStoredUser() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const [user, setUser] = useState<User | null>(getStoredUser)
   const [isLoading, setIsLoading] = useState(true)
   const initRun = useRef(false)
@@ -132,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     if (!popup) {
-      toast.error('Popup was blocked. Please allow popups for this site and try again.')
+      toast.error(t('errors.popupBlocked'))
       return
     }
 
@@ -151,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         handleAuthResponse(event.data.payload as AuthResponse)
         cleanup()
       } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
-        toast.error('Google sign-in failed. Please try again.')
+        toast.error(t('errors.googleSignInFailed'))
         cleanup()
       }
     }

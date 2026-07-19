@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '../lib/prisma.js';
 import redis from '../lib/redis.js';
 import { isAuth } from '../middleware/isAuthenticated.js';
-import errorHandler from '../middleware/errorHandler.js';
+import { errorHandler } from '../middleware/errorHandler.js';
 import * as JWT from '../lib/jwt.js';
 import crypto from 'crypto';
 import { emailQueue } from '../lib/bullmq.js';

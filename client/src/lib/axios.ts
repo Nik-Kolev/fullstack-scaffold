@@ -27,6 +27,16 @@ api.interceptors.request.use((config) => {
 type RetryableConfig = AxiosRequestConfig & { _retry?: boolean }
 type QueueEntry = (err: unknown) => void
 
+// These never carry a Bearer token worth refreshing — /auth/change-password does, so it's excluded here on purpose.
+const NON_RETRYABLE_AUTH_PATHS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/logout',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/google/exchange',
+]
+
 let isRefreshing = false
 let waitQueue: QueueEntry[] = []
 
@@ -40,8 +50,10 @@ api.interceptors.response.use(
   async (error) => {
     const original: RetryableConfig = error.config
 
-    const isAuthRoute = original.url?.includes('/auth/')
-    if (error.response?.status !== 401 || original._retry || isAuthRoute) {
+    const isNonRetryableAuthRoute = NON_RETRYABLE_AUTH_PATHS.some((path) =>
+      original.url?.includes(path),
+    )
+    if (error.response?.status !== 401 || original._retry || isNonRetryableAuthRoute) {
       return Promise.reject(error)
     }
 

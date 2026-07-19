@@ -6,7 +6,7 @@ import type { Application } from 'express';
 
 import expressConfig from './config/expressConfig.js';
 import router from './routes/index.js';
-import errorHandler from './middleware/errorHandler.js';
+import { errorHandler } from './middleware/errorHandler.js';
 import * as paymentController from './controllers/paymentController.js';
 
 const __filename = fileURLToPath(import.meta.url);

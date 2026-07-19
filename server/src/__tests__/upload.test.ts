@@ -15,6 +15,8 @@ vi.mock('../lib/r2.js', () => ({
 }));
 
 const TEST_USER = { email: 'upload-test@example.com', password: 'Test1234', name: 'Uploader' };
+// Real PNG signature — uploadServices.ts now verifies content against the declared mimetype.
+const PNG_BUFFER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 beforeEach(async () => {
 	await prisma.payment.deleteMany();
@@ -49,12 +51,12 @@ describe('POST /api/upload', () => {
 
 		const res = await uploadReq(accessToken)
 			.field('folderName', 'images')
-			.attach('files', Buffer.from('fake image content'), {
+			.attach('files', PNG_BUFFER, {
 				filename: 'photo.png',
 				contentType: 'image/png',
 			});
 
-		expect(res.status).toBe(200);
+		expect(res.status).toBe(201);
 		expect(res.body.fileData).toHaveLength(1);
 		expect(res.body.fileData[0]).toMatchObject({
 			originalName: 'photo.png',
@@ -68,28 +70,26 @@ describe('POST /api/upload', () => {
 
 		const res = await uploadReq(accessToken)
 			.field('folderName', 'documents')
-			.attach('files', Buffer.from('file one'), {
+			.attach('files', PNG_BUFFER, {
 				filename: 'a.png',
 				contentType: 'image/png',
 			})
-			.attach('files', Buffer.from('file two'), {
+			.attach('files', PNG_BUFFER, {
 				filename: 'b.png',
 				contentType: 'image/png',
 			});
 
-		expect(res.status).toBe(200);
+		expect(res.status).toBe(201);
 		expect(res.body.fileData).toHaveLength(2);
 	});
 
 	it('persists uploaded files to the database', async () => {
 		const accessToken = await registerAndLogin();
 
-		await uploadReq(accessToken)
-			.field('folderName', 'images')
-			.attach('files', Buffer.from('fake image content'), {
-				filename: 'photo.png',
-				contentType: 'image/png',
-			});
+		await uploadReq(accessToken).field('folderName', 'images').attach('files', PNG_BUFFER, {
+			filename: 'photo.png',
+			contentType: 'image/png',
+		});
 
 		const rows = await prisma.userFile.findMany();
 		expect(rows).toHaveLength(1);
@@ -100,12 +100,10 @@ describe('POST /api/upload', () => {
 		const accessToken = await registerAndLogin();
 		const user = await prisma.user.findUniqueOrThrow({ where: { email: TEST_USER.email } });
 
-		await uploadReq(accessToken)
-			.field('folderName', 'images')
-			.attach('files', Buffer.from('fake image content'), {
-				filename: 'photo.png',
-				contentType: 'image/png',
-			});
+		await uploadReq(accessToken).field('folderName', 'images').attach('files', PNG_BUFFER, {
+			filename: 'photo.png',
+			contentType: 'image/png',
+		});
 
 		expect(uploadFile).toHaveBeenCalledWith(
 			expect.stringMatching(new RegExp(`^${user.id}/images/.+\\.png$`)),
@@ -192,11 +190,11 @@ describe('POST /api/upload', () => {
 
 		const res = await uploadReq(accessToken)
 			.field('folderName', 'images')
-			.attach('files', Buffer.from('file one'), {
+			.attach('files', PNG_BUFFER, {
 				filename: 'a.png',
 				contentType: 'image/png',
 			})
-			.attach('files', Buffer.from('file two'), {
+			.attach('files', PNG_BUFFER, {
 				filename: 'b.png',
 				contentType: 'image/png',
 			});
@@ -221,7 +219,7 @@ describe('DELETE /api/upload/:key', () => {
 	async function uploadOneFile(accessToken: string) {
 		const res = await uploadReq(accessToken)
 			.field('folderName', 'images')
-			.attach('files', Buffer.from('fake image content'), {
+			.attach('files', PNG_BUFFER, {
 				filename: 'photo.png',
 				contentType: 'image/png',
 			});
@@ -287,12 +285,10 @@ describe('DELETE /api/upload/:key', () => {
 
 describe('GET /api/upload/folder/:name', () => {
 	async function uploadToFolder(accessToken: string, folder: string) {
-		await uploadReq(accessToken)
-			.field('folderName', folder)
-			.attach('files', Buffer.from('fake content'), {
-				filename: 'photo.png',
-				contentType: 'image/png',
-			});
+		await uploadReq(accessToken).field('folderName', folder).attach('files', PNG_BUFFER, {
+			filename: 'photo.png',
+			contentType: 'image/png',
+		});
 	}
 
 	it('returns files in the requested folder', async () => {
@@ -364,12 +360,10 @@ describe('GET /api/upload/folder/:name', () => {
 
 describe('GET /api/upload/folders', () => {
 	async function uploadToFolder(accessToken: string, folder: string) {
-		await uploadReq(accessToken)
-			.field('folderName', folder)
-			.attach('files', Buffer.from('fake content'), {
-				filename: 'photo.png',
-				contentType: 'image/png',
-			});
+		await uploadReq(accessToken).field('folderName', folder).attach('files', PNG_BUFFER, {
+			filename: 'photo.png',
+			contentType: 'image/png',
+		});
 	}
 
 	it('returns all distinct folder names for the user', async () => {

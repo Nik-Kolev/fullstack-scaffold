@@ -2,7 +2,7 @@ import prisma from '../lib/prisma.js';
 import { toSafeUser } from '../utils/safeUser.js';
 
 export const getUser = async (id: number) => {
-	const user = await prisma.user.findUnique({ where: { id } });
+	const user = await prisma.user.findUnique({ where: { id }, omit: { password: true } });
 	return user ? toSafeUser(user) : null;
 };
 

@@ -18,7 +18,10 @@ export default function CookieBanner() {
   }
 
   return (
-    <div className="bg-background fixed right-0 bottom-0 left-0 z-50 border-t px-6 py-4 shadow-lg">
+    <div
+      data-testid="cookie-banner"
+      className="bg-background fixed right-0 bottom-0 left-0 z-50 border-t px-6 py-4 shadow-lg"
+    >
       <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <p className="text-foreground text-sm">
           {t('cookies.message')}{' '}

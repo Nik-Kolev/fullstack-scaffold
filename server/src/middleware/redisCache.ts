@@ -1,38 +1,13 @@
-import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
-import redis from '../lib/redis.js';
+import redis, { acquireLock, releaseLock } from '../lib/redis.js';
 
 const LOCK_TTL_MS = 5000;
 const POLL_INTERVAL_MS = 50;
 // Must stay >= LOCK_TTL_MS, else losers fall through to an unprotected DB hit while the lock is still valid.
 const POLL_CEILING_MS = LOCK_TTL_MS + POLL_INTERVAL_MS;
 
-// Atomic "delete only if the token still matches" — a plain GET+compare+DEL
-// isn't atomic and could delete a different holder's lock after our own expired.
-const UNLOCK_SCRIPT = `
-if redis.call("get", KEYS[1]) == ARGV[1] then
-	return redis.call("del", KEYS[1])
-else
-	return 0
-end
-`;
-
 function sleep(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function releaseLock(lockKey: string, token: string) {
-	try {
-		await redis.eval(UNLOCK_SCRIPT, 1, lockKey, token);
-	} catch {
-		// Best-effort unlock — if this fails, the lock still expires via its own PX TTL.
-	}
-}
-
-async function tryAcquireLock(lockKey: string) {
-	const token = crypto.randomUUID();
-	const acquired = await redis.set(lockKey, token, 'PX', LOCK_TTL_MS, 'NX');
-	return acquired === 'OK' ? token : null;
 }
 
 // Skips the write if a mutation invalidated the cache after this request
@@ -96,7 +71,7 @@ export function redisCache(ttlSeconds: number) {
 			return next();
 		}
 
-		const token = await tryAcquireLock(lockKey);
+		const token = await acquireLock(lockKey, LOCK_TTL_MS);
 		if (token) {
 			return becomeWinner(token);
 		}
@@ -113,7 +88,7 @@ export function redisCache(ttlSeconds: number) {
 				return res.json(JSON.parse(cachedNow));
 			}
 
-			const retryToken = await tryAcquireLock(lockKey);
+			const retryToken = await acquireLock(lockKey, LOCK_TTL_MS);
 			if (retryToken) {
 				return becomeWinner(retryToken);
 			}

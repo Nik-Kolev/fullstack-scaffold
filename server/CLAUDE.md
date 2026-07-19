@@ -63,6 +63,10 @@ npm run format            # prettier --write src/**/*.ts
 - `validateBody` throws `CustomError(400)` and strips unknown fields via `result.data`.
 - `errorHandler` stays Zod-free — errors arrive as `CustomError`.
 
+### File uploads
+
+- `utils/fileValidation.ts` verifies uploaded bytes against the declared mimetype (magic-byte check) and derives the storage extension from the mimetype, not the client-supplied filename — a client-supplied mimetype/extension is trivially spoofable. `assertMatchesDeclaredType`/`extensionForMimeType` are the shared entry points; both `uploadServices.ts` (user files) and `productService.ts` (product images) call them before any R2 write. Any new upload path must reuse these, not reimplement its own content check.
+
 ### Linting
 
 - `eslint.config.js` — flat config, mirrors `client/eslint.config.js` (`@eslint/js` + `typescript-eslint` + `globals`), swapped to `globals.node` with no React plugins.

@@ -9,6 +9,8 @@ const r2 = new S3Client({
 	},
 });
 
+// Returns a permanent public URL, deliberately — presigned/expiring URLs would need the
+// @aws-sdk/s3-request-presigner package, worth adding only if a future project needs per-file privacy.
 export async function uploadFile(key: string, buffer: Buffer, mimeType: string): Promise<string> {
 	await r2.send(
 		new PutObjectCommand({

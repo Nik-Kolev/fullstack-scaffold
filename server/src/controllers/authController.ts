@@ -37,8 +37,12 @@ export const logoutUser = async (req: Request, res: Response) => {
 	const cookie = req.cookies.refreshToken;
 
 	if (cookie) {
-		const token = JWT.verifyToken('refresh', cookie);
-		await authService.logoutUser(token.refreshTokenId!);
+		try {
+			const token = JWT.verifyToken('refresh', cookie);
+			await authService.logoutUser(token.refreshTokenId!);
+		} catch {
+			// invalid/expired refresh token - nothing to delete, still clear the cookie below
+		}
 	}
 
 	const authHeader = req.headers.authorization;
@@ -70,11 +74,7 @@ export const refreshToken = async (req: Request, res: Response) => {
 
 		const { accessToken, refreshToken } = await authService.refreshToken(
 			token.refreshTokenId!,
-			{
-				id: token.userId as number,
-				email: token.email as string,
-				role: token.role as string,
-			},
+			token.userId as number,
 		);
 
 		res.cookie('refreshToken', refreshToken.token, {
@@ -97,8 +97,16 @@ export const googleRedirect = (req: Request, res: Response) => {
 
 export const googleCallback = async (req: Request, res: Response) => {
 	const code = req.query.code as string;
-	const { oauthCode } = await authService.handleGoogleCallback(code);
-	res.redirect(`${process.env.ORIGIN}/auth/callback?code=${oauthCode}`);
+
+	try {
+		const { oauthCode } = await authService.handleGoogleCallback(code);
+		res.redirect(`${process.env.ORIGIN}/auth/callback?code=${oauthCode}`);
+	} catch {
+		// This leg must always redirect back into the popup, success or failure —
+		// GoogleCallbackPage.tsx is the only place that can postMessage to window.opener,
+		// so letting an error reach errorHandler here would dead-end as raw JSON in the popup.
+		res.redirect(`${process.env.ORIGIN}/auth/callback?error=1`);
+	}
 };
 
 export const exchangeGoogleCode = async (req: Request, res: Response) => {

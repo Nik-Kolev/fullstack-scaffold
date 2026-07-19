@@ -1,14 +1,13 @@
 import request from 'supertest';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { isAuth } from '../middleware/isAuthenticated.js';
 
 import { requireRole } from '../middleware/requireRole.js';
-import errorHandler from '../middleware/errorHandler.js';
-import CustomError from '../utils/customError.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
+import { errorHandler } from '../middleware/errorHandler.js';
 import redis from '../lib/redis.js';
 
 afterAll(async () => {
@@ -143,27 +142,32 @@ describe('requireRole middleware', () => {
 // ─── authLimiter ─────────────────────────────────────────────────────────────
 
 describe('authLimiter', () => {
+	const originalNodeEnv = process.env.NODE_ENV;
 	let limiterApp: express.Application;
 
-	beforeEach(() => {
-		const handler = (_req: Request, _res: Response, next: NextFunction) =>
-			next(new CustomError(429, 'Too many requests.'));
-		const limiter = rateLimit({ windowMs: 60_000, limit: 3, handler });
+	beforeEach(async () => {
+		process.env.NODE_ENV = 'production'; // authLimiter's skip() only limits in production
+		const keys = await redis.keys('rl:auth:*');
+		if (keys.length) await redis.del(...keys);
 		limiterApp = express();
-		limiterApp.use(limiter);
+		limiterApp.use(authLimiter);
 		limiterApp.get('/ping', (_req, res) => res.sendStatus(200));
 		limiterApp.use(errorHandler);
 	});
 
+	afterAll(() => {
+		process.env.NODE_ENV = originalNodeEnv;
+	});
+
 	it('allows requests within the limit', async () => {
-		for (let i = 0; i < 3; i++) {
+		for (let i = 0; i < 10; i++) {
 			const res = await request(limiterApp).get('/ping');
 			expect(res.status).toBe(200);
 		}
 	});
 
 	it('returns 429 when the limit is exceeded', async () => {
-		for (let i = 0; i < 3; i++) {
+		for (let i = 0; i < 10; i++) {
 			await request(limiterApp).get('/ping');
 		}
 		const res = await request(limiterApp).get('/ping');

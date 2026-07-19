@@ -83,16 +83,18 @@ export const logoutUser = async (refreshTokenId: string) => {
 	await prisma.refreshToken.deleteMany({ where: { refreshTokenId } });
 };
 
-export const refreshToken = async (
-	refreshTokenId: string,
-	user: { id: number; email: string; role: string },
-) => {
+export const refreshToken = async (refreshTokenId: string, userId: number) => {
 	const deleted = await prisma.refreshToken.deleteMany({
 		where: { refreshTokenId, expiresAt: { gt: new Date() } },
 	});
 
 	if (deleted.count === 0) {
 		throw new CustomError(401, 'Invalid or expired refresh token.');
+	}
+
+	const user = await prisma.user.findUnique({ where: { id: userId } });
+	if (!user) {
+		throw new CustomError(401, 'Session is invalid, please log in again.');
 	}
 
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
@@ -118,6 +120,14 @@ export const handleGoogleCallback = async (code: string) => {
 	client.setCredentials(tokens);
 
 	const { data } = await google.oauth2('v2').userinfo.get({ auth: client });
+
+	if (!data.verified_email) {
+		throw new CustomError(
+			403,
+			'Google account email is not verified.',
+			'GOOGLE_EMAIL_UNVERIFIED',
+		);
+	}
 
 	const user = await prisma.user.upsert({
 		where: { email: data.email as string },

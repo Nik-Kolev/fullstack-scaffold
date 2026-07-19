@@ -3,6 +3,7 @@ import prisma from '../lib/prisma.js';
 import { uploadFile, deleteFile as deleteR2File } from '../lib/r2.js';
 import { invalidateListCache, invalidateDetailCache } from '../lib/redis.js';
 import CustomError from '../utils/customError.js';
+import { assertMatchesDeclaredType, extensionForMimeType } from '../utils/fileValidation.js';
 import { titleCase } from '../schemas/product.schema.js';
 import type { Prisma } from '../generated/prisma/index.js';
 
@@ -76,6 +77,8 @@ type ProductInput = {
 };
 
 export const createProduct = async (data: ProductInput, file?: Express.Multer.File) => {
+	if (file) assertMatchesDeclaredType(file);
+
 	const product = await prisma.product.create({ data });
 
 	if (!file) {
@@ -84,7 +87,7 @@ export const createProduct = async (data: ProductInput, file?: Express.Multer.Fi
 	}
 
 	try {
-		const ext = file.originalname.split('.').pop();
+		const ext = extensionForMimeType(file.mimetype);
 		const key = `products/${product.id}/${crypto.randomUUID()}.${ext}`;
 		const imageUrl = await uploadFile(key, file.buffer, file.mimetype);
 		const updated = await prisma.product.update({
@@ -204,12 +207,14 @@ export const uploadProductImage = async (id: number, file: Express.Multer.File) 
 	const product = await prisma.product.findUnique({ where: { id } });
 	if (!product) throw new CustomError(404, 'Product not found.');
 
+	assertMatchesDeclaredType(file);
+
 	if (product.imageUrl) {
 		const oldKey = product.imageUrl.replace(`${process.env.R2_PUBLIC_URL!}/`, '');
 		await deleteR2File(oldKey);
 	}
 
-	const ext = file.originalname.split('.').pop();
+	const ext = extensionForMimeType(file.mimetype);
 	const key = `products/${id}/${crypto.randomUUID()}.${ext}`;
 	const imageUrl = await uploadFile(key, file.buffer, file.mimetype);
 

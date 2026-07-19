@@ -13,8 +13,6 @@ vi.mock('@react-email/render', () => ({
 	render: vi.fn().mockResolvedValue('<html>mock</html>'),
 }));
 
-const queueEvents = new QueueEvents('emails', { connection: redisConnectionOptions });
-
 // Own queue/worker, not the shared 'emails' one — other files (e.g. auth.test.ts) enqueue real jobs there.
 const e2eQueue = new Queue('emails-e2e-test', { connection: redisConnectionOptions });
 const e2eWorker = new Worker('emails-e2e-test', handleEmailJob, {
@@ -28,9 +26,8 @@ describe('email worker', () => {
 	});
 
 	afterAll(async () => {
+		// Only closes the connection — never obliterates the shared 'emails' queue other files still use.
 		await emailWorker.close();
-		await queueEvents.close();
-		await emailQueue.obliterate({ force: true });
 		await emailQueue.close();
 		await e2eWorker.close();
 		await e2eQueueEvents.close();

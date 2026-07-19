@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '@/context/AuthContext'
 import * as authService from '@/services/auth'
@@ -9,7 +10,9 @@ export default function GoogleCallbackPage() {
   const [searchParams] = useSearchParams()
   const { googleExchange } = useAuth()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const code = searchParams.get('code')
+  const hasError = searchParams.get('error') === '1'
   const hasRun = useRef(false)
 
   useEffect(() => {
@@ -18,12 +21,12 @@ export default function GoogleCallbackPage() {
 
     const isPopup = window.opener !== null
 
-    if (!code) {
+    if (!code || hasError) {
       if (isPopup) {
         window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR' }, window.location.origin)
         window.close()
       } else {
-        toast.error('Invalid OAuth callback.')
+        toast.error(hasError ? t('errors.googleSignInFailed') : t('errors.invalidOAuthCallback'))
         navigate('/login', { replace: true })
       }
       return
@@ -47,11 +50,11 @@ export default function GoogleCallbackPage() {
       googleExchange(code)
         .then(() => navigate('/', { replace: true }))
         .catch(() => {
-          toast.error('Google sign-in failed. Please try again.')
+          toast.error(t('errors.googleSignInFailed'))
           navigate('/login', { replace: true })
         })
     }
-  }, [code, googleExchange, navigate])
+  }, [code, hasError, googleExchange, navigate, t])
 
   return (
     <div className="flex min-h-screen items-center justify-center">
