@@ -343,6 +343,128 @@ describe('GET /api/product', () => {
 	});
 });
 
+// ─── GET /api/product caching ────────────────────────────────────────────────
+
+describe('GET /api/product caching', () => {
+	it('serves an identical second request from cache without hitting the DB again', async () => {
+		await seedProduct();
+		const findManySpy = vi.spyOn(prisma.product, 'findMany');
+
+		const first = await request(app).get('/api/product');
+		const second = await request(app).get('/api/product');
+
+		expect(findManySpy).toHaveBeenCalledTimes(1);
+		expect(second.body).toEqual(first.body);
+		findManySpy.mockRestore();
+	});
+
+	it('stores the response under cache:<url> with the configured TTL', async () => {
+		await seedProduct();
+
+		const res = await request(app).get('/api/product');
+		const cached = await redis.get('cache:/api/product');
+
+		expect(cached).not.toBeNull();
+		expect(JSON.parse(cached!)).toEqual(res.body);
+
+		const ttl = await redis.ttl('cache:/api/product');
+		expect(ttl).toBeGreaterThan(0);
+		expect(ttl).toBeLessThanOrEqual(60);
+	});
+
+	it('caches distinct query strings independently', async () => {
+		await seedProduct({ name: 'P1' });
+		await seedProduct({ name: 'P2' });
+		const findManySpy = vi.spyOn(prisma.product, 'findMany');
+
+		await request(app).get('/api/product?limit=1');
+		await request(app).get('/api/product?limit=2');
+
+		expect(findManySpy).toHaveBeenCalledTimes(2);
+		findManySpy.mockRestore();
+	});
+
+	it('does not cache an error response', async () => {
+		const first = await request(app).get('/api/product?cursor=not-valid-base64json');
+		const second = await request(app).get('/api/product?cursor=not-valid-base64json');
+
+		expect(first.status).toBe(400);
+		expect(second.status).toBe(400);
+		const keys = await redis.keys('cache:/api/product?cursor=not-valid-base64json*');
+		expect(keys).toHaveLength(0);
+	});
+
+	it('releases the lock after populating the cache', async () => {
+		await seedProduct();
+		await request(app).get('/api/product');
+
+		const lock = await redis.get('lock:cache:/api/product');
+		expect(lock).toBeNull();
+	});
+
+	it('handles a stampede of concurrent requests with only one DB hit', async () => {
+		await seedProduct();
+		const originalFindMany = prisma.product.findMany.bind(prisma.product);
+		const findManySpy = vi.spyOn(prisma.product, 'findMany').mockImplementationOnce(
+			// Mocking a real method's return type past its exact (branded PrismaPromise) shape —
+			// an async wrapper can only ever return a plain Promise, never that brand.
+			(async (args: Parameters<typeof originalFindMany>[0]) => {
+				await new Promise((resolve) => setTimeout(resolve, 150));
+				return originalFindMany(args);
+			}) as unknown as typeof originalFindMany,
+		);
+
+		const responses = await Promise.all(
+			Array.from({ length: 10 }, () => request(app).get('/api/product')),
+		);
+
+		responses.forEach((res) => {
+			expect(res.status).toBe(200);
+			expect(res.body.products).toHaveLength(1);
+		});
+		expect(findManySpy).toHaveBeenCalledTimes(1);
+		findManySpy.mockRestore();
+	});
+
+	it('falls through to an unprotected fetch when the lock is never released', async () => {
+		await seedProduct();
+		await redis.set('lock:cache:/api/product', 'stuck-token', 'PX', 5000, 'NX');
+
+		const res = await request(app).get('/api/product');
+
+		expect(res.status).toBe(200);
+		expect(res.body.products).toHaveLength(1);
+	}, 8000);
+
+	it('lets a loser retry the lock and finish the query when the winner fails', async () => {
+		await seedProduct();
+		const findManySpy = vi.spyOn(prisma.product, 'findMany').mockImplementationOnce(
+			// Same test-only cast as the stampede test above — an async wrapper can
+			// only ever return a plain Promise, never the real branded PrismaPromise.
+			(async () => {
+				throw new Error('Simulated DB failure for the lock winner');
+			}) as unknown as typeof prisma.product.findMany,
+		);
+
+		const responses = await Promise.all(
+			Array.from({ length: 10 }, () => request(app).get('/api/product')),
+		);
+
+		const failed = responses.filter((res) => res.status === 500);
+		const succeeded = responses.filter((res) => res.status === 200);
+
+		expect(failed).toHaveLength(1);
+		expect(succeeded).toHaveLength(9);
+		succeeded.forEach((res) => {
+			expect(res.body.products).toHaveLength(1);
+		});
+		// Bounded to the winner's failed attempt plus exactly one retry winner —
+		// not the pre-fix behaviour of every loser falling through to the DB.
+		expect(findManySpy).toHaveBeenCalledTimes(2);
+		findManySpy.mockRestore();
+	});
+});
+
 // ─── GET /api/product/:id ────────────────────────────────────────────────────
 
 describe('GET /api/product/:id', () => {
@@ -1010,5 +1132,116 @@ describe('DELETE /api/product/:id/like', () => {
 			where: { productId_userId: { productId: product.id, userId: user.id } },
 		});
 		expect(like).toBeNull();
+	});
+});
+
+// ─── Cache invalidation ───────────────────────────────────────────────────────
+
+describe('cache invalidation', () => {
+	it('invalidates the cache after creating a product', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const before = await request(app).get('/api/product');
+		expect(before.body.products).toHaveLength(0);
+
+		await request(app)
+			.post('/api/product')
+			.set('Authorization', `Bearer ${token}`)
+			.send({ ...PRODUCT_DATA, categoryId, color: 'black', shape: 'square' });
+
+		const after = await request(app).get('/api/product');
+		expect(after.body.products).toHaveLength(1);
+	});
+
+	it('invalidates the cache after updating a product', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct();
+		await request(app).get('/api/product');
+
+		await request(app)
+			.put(`/api/product/${product.id}`)
+			.set('Authorization', `Bearer ${token}`)
+			.send({ name: 'Updated Widget' });
+
+		const after = await request(app).get('/api/product');
+		expect(after.body.products[0].name).toBe('Updated Widget');
+	});
+
+	it('invalidates the cache after deactivating a product', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct();
+		const before = await request(app).get('/api/product');
+		expect(before.body.products).toHaveLength(1);
+
+		await request(app)
+			.delete(`/api/product/${product.id}`)
+			.set('Authorization', `Bearer ${token}`);
+
+		const after = await request(app).get('/api/product');
+		expect(after.body.products).toHaveLength(0);
+	});
+
+	it('invalidates the cache after uploading a product image', async () => {
+		mockUploadFile.mockResolvedValueOnce('https://r2.example.com/products/1/uuid.jpg');
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct();
+		await request(app).get('/api/product');
+
+		await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', Buffer.from('fake'), {
+				filename: 'test.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		const after = await request(app).get('/api/product');
+		expect(after.body.products[0].imageUrl).toBe('https://r2.example.com/products/1/uuid.jpg');
+	});
+
+	it('invalidates the cache after deleting a product image', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/img.jpg',
+		});
+		const before = await request(app).get('/api/product');
+		expect(before.body.products[0].imageUrl).toBe('https://r2.example.com/products/1/img.jpg');
+
+		await request(app)
+			.delete(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`);
+
+		const after = await request(app).get('/api/product');
+		expect(after.body.products[0].imageUrl).toBeNull();
+	});
+
+	it('invalidates the cache after liking a product', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+		const before = await request(app).get('/api/product');
+		expect(before.body.products[0].likesCount).toBe(0);
+
+		await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+
+		const after = await request(app).get('/api/product');
+		expect(after.body.products[0].likesCount).toBe(1);
+	});
+
+	it('invalidates the cache after unliking a product', async () => {
+		const token = await registerAndLoginAsUser();
+		const product = await seedProduct();
+		await request(app)
+			.post(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+		const before = await request(app).get('/api/product');
+		expect(before.body.products[0].likesCount).toBe(1);
+
+		await request(app)
+			.delete(`/api/product/${product.id}/like`)
+			.set('Authorization', `Bearer ${token}`);
+
+		const after = await request(app).get('/api/product');
+		expect(after.body.products[0].likesCount).toBe(0);
 	});
 });
