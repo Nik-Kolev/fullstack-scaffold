@@ -1,17 +1,26 @@
 import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
 import { uploadFile, deleteFile as deleteR2File } from '../lib/r2.js';
-import { invalidateCache } from '../lib/redis.js';
+import { invalidateListCache, invalidateDetailCache } from '../lib/redis.js';
 import CustomError from '../utils/customError.js';
 import { titleCase } from '../schemas/product.schema.js';
 import type { Prisma } from '../generated/prisma/index.js';
 
 async function invalidateProductListCache() {
 	try {
-		await invalidateCache('/api/product');
+		await invalidateListCache('/api/product');
 	} catch {
 		// Redis failure — the DB write already succeeded; a stale cached list
 		// is preferable to failing an otherwise-successful mutation.
+	}
+}
+
+async function invalidateProductCache(id: number) {
+	await invalidateProductListCache();
+	try {
+		await invalidateDetailCache(`/api/product/${id}`);
+	} catch {
+		// Same trade-off as invalidateProductListCache above.
 	}
 }
 
@@ -157,7 +166,7 @@ export const updateProduct = async (id: number, data: Partial<ProductInput>) => 
 	const product = await prisma.product.findUnique({ where: { id } });
 	if (!product) throw new CustomError(404, 'Product not found.');
 	const updated = await prisma.product.update({ where: { id }, data });
-	await invalidateProductListCache();
+	await invalidateProductCache(id);
 	return updated;
 };
 
@@ -174,7 +183,7 @@ export const deactivateProduct = async (id: number) => {
 		where: { id },
 		data: { isActive: false, imageUrl: null },
 	});
-	await invalidateProductListCache();
+	await invalidateProductCache(id);
 	return updated;
 };
 
@@ -187,7 +196,7 @@ export const deleteProductImage = async (id: number) => {
 	await deleteR2File(key);
 
 	const updated = await prisma.product.update({ where: { id }, data: { imageUrl: null } });
-	await invalidateProductListCache();
+	await invalidateProductCache(id);
 	return updated;
 };
 
@@ -205,7 +214,7 @@ export const uploadProductImage = async (id: number, file: Express.Multer.File) 
 	const imageUrl = await uploadFile(key, file.buffer, file.mimetype);
 
 	const updated = await prisma.product.update({ where: { id }, data: { imageUrl } });
-	await invalidateProductListCache();
+	await invalidateProductCache(id);
 	return updated;
 };
 
@@ -220,7 +229,7 @@ export const likeProduct = async (productId: number, userId: number) => {
 			data: { likesCount: { increment: 1 } },
 		});
 	});
-	await invalidateProductListCache();
+	await invalidateProductCache(productId);
 	return updated;
 };
 
@@ -237,6 +246,6 @@ export const unlikeProduct = async (productId: number, userId: number) => {
 			data: { likesCount: { decrement: 1 } },
 		});
 	});
-	await invalidateProductListCache();
+	await invalidateProductCache(productId);
 	return updated;
 };

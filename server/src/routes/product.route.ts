@@ -12,10 +12,10 @@ const router = Router();
 router.get(
 	'/',
 	validateQuery(productSchemas.productQuerySchema),
-	redisCache(60),
+	redisCache(300),
 	productController.getProducts,
 );
-router.get('/:id', productController.getProductById);
+router.get('/:id', redisCache(300), productController.getProductById);
 router.post(
 	'/',
 	isAuth,
