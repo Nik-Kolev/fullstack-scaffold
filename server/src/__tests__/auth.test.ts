@@ -14,6 +14,27 @@ vi.mock('../lib/bullmq.js', () => ({
 	emailQueue: { add: vi.fn() },
 }));
 
+// Only the OAuth2 client's getToken is exercised here — the point is verifying
+// the /google/callback controller always redirects (never returns raw JSON) on
+// failure, not the specific reason the exchange failed.
+vi.mock('googleapis', () => ({
+	google: {
+		auth: {
+			// A real `function`, not an arrow — arrow functions have no [[Construct]]
+			// internal method, so `new google.auth.OAuth2(...)` needs this to be
+			// constructor-callable.
+			OAuth2: vi.fn().mockImplementation(function () {
+				return {
+					getToken: vi.fn().mockRejectedValue(new Error('invalid_grant')),
+					setCredentials: vi.fn(),
+					generateAuthUrl: vi.fn(),
+				};
+			}),
+		},
+		oauth2: vi.fn(),
+	},
+}));
+
 const TEST_USER = { email: 'test@example.com', password: 'Test1234', name: 'Tester' };
 
 // Mini app used to test that blacklisted tokens are rejected by isAuth
@@ -223,6 +244,21 @@ describe('POST /api/auth/refresh', () => {
 		expect(refreshRes.status).toBe(200);
 		expect(refreshRes.body.accessToken).not.toBe(firstToken);
 	});
+
+	it('reflects a role change made after login — refresh re-reads the user instead of trusting the stale JWT payload', async () => {
+		await register();
+		const loginRes = await login();
+		const cookie = getCookies(loginRes).join('; ');
+
+		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+		await prisma.user.update({ where: { id: user!.id }, data: { role: 'admin' } });
+
+		const res = await request(app).post('/api/auth/refresh').set('Cookie', cookie);
+
+		expect(res.status).toBe(200);
+		const payload = JWT.verifyToken('access', res.body.accessToken);
+		expect(payload.role).toBe('admin');
+	});
 });
 
 // ─── Logout ──────────────────────────────────────────────────────────────────
@@ -241,6 +277,16 @@ describe('POST /api/auth/logout', () => {
 	it('returns 204 with no refresh cookie (graceful)', async () => {
 		const res = await request(app).post('/api/auth/logout');
 		expect(res.status).toBe(204);
+	});
+
+	it('returns 204 and still clears the cookie with a garbage/invalid refresh token cookie', async () => {
+		const res = await request(app)
+			.post('/api/auth/logout')
+			.set('Cookie', 'refreshToken=totally-invalid-garbage');
+
+		expect(res.status).toBe(204);
+		const cookies = getCookies(res);
+		expect(cookies.some((c) => c.startsWith('refreshToken=;'))).toBe(true);
 	});
 
 	it('response sets refreshToken cookie to empty on logout', async () => {
@@ -777,5 +823,18 @@ describe('POST /api/auth/google/exchange', () => {
 			.send({ code: 'not-a-uuid' });
 
 		expect(res.status).toBe(400);
+	});
+});
+
+// ─── Google OAuth Callback ────────────────────────────────────────────────────
+
+describe('GET /api/auth/google/callback', () => {
+	it('redirects back into the popup with ?error=1 instead of raw JSON when the exchange fails', async () => {
+		const res = await request(app).get('/api/auth/google/callback?code=bad-code');
+
+		expect(res.status).toBe(302);
+		const location = res.headers.location as string;
+		expect(location).toContain('/auth/callback');
+		expect(location).toContain('error=1');
 	});
 });

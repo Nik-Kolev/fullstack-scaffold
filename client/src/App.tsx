@@ -20,6 +20,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
+        {/* Rendered before the routed tree so its mount effect commits first — a page
+            that calls toast() in its own first effect (e.g. GoogleCallbackPage on a
+            cold load) would otherwise race Toaster's own mount and lose the toast. */}
+        <Toaster />
         <AuthProvider>
           <Routes>
             <Route element={<Layout />}>
@@ -40,7 +44,6 @@ export default function App() {
             <Route path="/auth/callback" element={<GoogleCallbackPage />} />
           </Routes>
         </AuthProvider>
-        <Toaster />
       </ErrorBoundary>
     </BrowserRouter>
   )

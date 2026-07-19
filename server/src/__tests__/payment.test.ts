@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type Stripe from 'stripe';
 import app from '../app.js';
 import prisma from '../lib/prisma.js';
-import redis from '../lib/redis.js';
+import redis, { acquireLock, releaseLock } from '../lib/redis.js';
 import stripe from '../lib/stripe.js';
 
 vi.mock('../lib/bullmq.js', () => ({ emailQueue: { add: vi.fn() } }));
@@ -233,6 +233,49 @@ describe('POST /api/payment/checkout', () => {
 			});
 			expect(payment?.amountTotal).toBe(3000);
 		});
+
+		it('sends unit_amount as product.price (per-unit), not amountTotal — Stripe multiplies by quantity itself', async () => {
+			const { accessToken } = await registerAndLogin();
+			await checkoutReq(accessToken, { productId: PRODUCT_ID, quantity: 3 });
+
+			const callArg = vi.mocked(stripe.checkout.sessions.create).mock.calls[0]?.[0];
+			const lineItem = callArg?.line_items?.[0] as {
+				price_data?: { unit_amount?: number };
+				quantity?: number;
+			};
+			expect(lineItem.price_data?.unit_amount).toBe(1000);
+			expect(lineItem.quantity).toBe(3);
+		});
+	});
+
+	describe('concurrency', () => {
+		it('returns 409 when the per-user checkout lock is already held, without touching Stripe', async () => {
+			const { accessToken, userId } = await registerAndLogin();
+
+			// Simulates another in-flight checkout request for this user by holding
+			// the exact lock createCheckoutSession itself acquires — deterministic,
+			// unlike racing two real HTTP requests against a fast local DB.
+			const lockToken = await acquireLock(`lock:checkout:${userId}`, 10_000);
+			expect(lockToken).not.toBeNull();
+
+			try {
+				const res = await checkoutReq(accessToken);
+
+				expect(res.status).toBe(409);
+				expect(vi.mocked(stripe.checkout.sessions.create)).not.toHaveBeenCalled();
+			} finally {
+				await releaseLock(`lock:checkout:${userId}`, lockToken!);
+			}
+		});
+
+		it('succeeds once the lock is released', async () => {
+			const { accessToken, userId } = await registerAndLogin();
+			const lockToken = await acquireLock(`lock:checkout:${userId}`, 10_000);
+			await releaseLock(`lock:checkout:${userId}`, lockToken!);
+
+			const res = await checkoutReq(accessToken);
+			expect(res.status).toBe(201);
+		});
 	});
 
 	describe('Stripe customer lifecycle', () => {
@@ -350,6 +393,17 @@ describe('POST /api/payment/checkout', () => {
 
 			const res = await checkoutReq(accessToken);
 			expect(res.status).toBe(500);
+		});
+
+		it('releases the lock after a Stripe error — the next attempt is not stuck behind it', async () => {
+			const { accessToken } = await registerAndLogin();
+			vi.mocked(stripe.checkout.sessions.create).mockRejectedValueOnce(new Error('Stripe down'));
+
+			const failed = await checkoutReq(accessToken);
+			expect(failed.status).toBe(500);
+
+			const retried = await checkoutReq(accessToken);
+			expect(retried.status).toBe(201);
 		});
 	});
 });
@@ -530,6 +584,33 @@ describe('POST /api/payment/webhook', () => {
 			});
 			expect(payment?.status).toBe('REFUNDED');
 			expect(payment?.refundedAt?.toISOString()).toBe(originalRefundedAt.toISOString());
+		});
+
+		it('ignores a refund webhook whose amount does not exceed the already-recorded refundedAmountTotal — stale/out-of-order delivery', async () => {
+			const user = await seedUser();
+			await seedPayment(user.id, {
+				status: 'PARTIALLY_REFUNDED',
+				stripePaymentIntentId: PI_ID,
+				refundedAmountTotal: 600,
+			});
+
+			const res = await sendWebhook({
+				type: 'charge.refunded',
+				data: {
+					object: {
+						payment_intent: PI_ID,
+						amount: 1000,
+						amount_refunded: 400,
+					} as any,
+				},
+			});
+
+			expect(res.status).toBe(200);
+			const payment = await prisma.payment.findFirst({
+				where: { stripePaymentIntentId: PI_ID },
+			});
+			expect(payment?.status).toBe('PARTIALLY_REFUNDED');
+			expect(payment?.refundedAmountTotal).toBe(600);
 		});
 
 		it('skips silently when payment_intent is an expanded object instead of a string ID — Stripe expand[] API', async () => {

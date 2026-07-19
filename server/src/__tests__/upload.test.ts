@@ -11,7 +11,7 @@ vi.mock('../lib/bullmq.js', () => ({
 
 vi.mock('../lib/r2.js', () => ({
 	uploadFile: vi.fn(async (key: string) => `https://fake-public-url.test/${key}`),
-	deleteFile: vi.fn(),
+	deleteFile: vi.fn(async () => undefined),
 }));
 
 const TEST_USER = { email: 'upload-test@example.com', password: 'Test1234', name: 'Uploader' };
@@ -154,6 +154,42 @@ describe('POST /api/upload', () => {
 
 		expect(res.status).toBe(400);
 		expect(uploadFile).not.toHaveBeenCalled();
+	});
+
+	it('returns 400 when file bytes do not match the declared mimetype — spoofed content', async () => {
+		const accessToken = await registerAndLogin();
+
+		const res = await uploadReq(accessToken)
+			.field('folderName', 'images')
+			.attach('files', Buffer.from('not actually a png'), {
+				filename: 'fake.png',
+				contentType: 'image/png',
+			});
+
+		expect(res.status).toBe(400);
+		expect(uploadFile).not.toHaveBeenCalled();
+		expect(await prisma.userFile.count()).toBe(0);
+	});
+
+	it('rolls back the R2 upload of a valid file when a later file in the same batch fails content validation', async () => {
+		const accessToken = await registerAndLogin();
+		vi.mocked(uploadFile).mockResolvedValueOnce('https://fake-public-url.test/1/images/a.png');
+
+		const res = await uploadReq(accessToken)
+			.field('folderName', 'images')
+			.attach('files', PNG_BUFFER, {
+				filename: 'a.png',
+				contentType: 'image/png',
+			})
+			.attach('files', Buffer.from('spoofed'), {
+				filename: 'b.png',
+				contentType: 'image/png',
+			});
+
+		expect(res.status).toBe(400);
+		expect(uploadFile).toHaveBeenCalledOnce();
+		expect(deleteFile).toHaveBeenCalledOnce();
+		expect(await prisma.userFile.count()).toBe(0);
 	});
 
 	it('returns 400 when a file exceeds the 5MB limit', async () => {

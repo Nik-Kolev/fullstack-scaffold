@@ -715,6 +715,27 @@ describe('POST /api/product', () => {
 		const count = await prisma.product.count();
 		expect(count).toBe(0);
 	});
+
+	it('returns 400 for spoofed image content and never creates the product row', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const res = await request(app)
+			.post('/api/product')
+			.set('Authorization', `Bearer ${token}`)
+			.field('name', 'Widget')
+			.field('price', '999')
+			.field('categoryId', String(categoryId))
+			.field('color', 'black')
+			.field('shape', 'square')
+			.attach('image', Buffer.from('not a real jpeg'), {
+				filename: 'fake.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		expect(res.status).toBe(400);
+		expect(mockUploadFile).not.toHaveBeenCalled();
+		const count = await prisma.product.count();
+		expect(count).toBe(0);
+	});
 });
 
 // ─── PUT /api/product/:id ────────────────────────────────────────────────────
@@ -941,6 +962,26 @@ describe('POST /api/product/:id/image', () => {
 
 		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
 		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/new.jpg');
+	});
+
+	it('returns 400 for spoofed replacement content and does not delete the existing image', async () => {
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/old.jpg',
+		});
+
+		const res = await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', Buffer.from('not a real jpeg'), {
+				filename: 'fake.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		expect(res.status).toBe(400);
+		expect(mockDeleteFile).not.toHaveBeenCalled();
+		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
+		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/old.jpg');
 	});
 
 	it('returns 500 and preserves old imageUrl when deleteFile rejects during image replacement', async () => {
