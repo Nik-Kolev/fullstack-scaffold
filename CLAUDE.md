@@ -127,4 +127,6 @@ STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing sec
 
 **API error convention — built.** `CustomError`/`errorHandler` carry a stable `code`; no bare `message` reaches the client. See `zod.md` for the full convention (response shape, named codes, `VALIDATION_ERROR` carve-out).
 
+**Product catalog & caching — done.** `Product` reshaped with `Category`/`Like` relations, cursor-based pagination with color/shape/price filters + sort, pg_trgm trigram search on name, and Redis-backed response caching on `GET /product` and `GET /product/:id` with cache-stampede lock protection and precise list-vs-detail invalidation. Load-tested via k6 against ~400k seeded products at 300 concurrent users (see `server/README.md`'s Performance Notes). Reviewer pass on the whole branch preceded merge to `develop` → `main`.
+
 **Next — Stripe checkout**, per `roadmap.md`.
