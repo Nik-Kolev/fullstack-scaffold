@@ -1,9 +1,19 @@
 import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
 import { uploadFile, deleteFile as deleteR2File } from '../lib/r2.js';
+import { invalidateCache } from '../lib/redis.js';
 import CustomError from '../utils/customError.js';
 import { titleCase } from '../schemas/product.schema.js';
 import type { Prisma } from '../generated/prisma/index.js';
+
+async function invalidateProductListCache() {
+	try {
+		await invalidateCache('/api/product');
+	} catch {
+		// Redis failure — the DB write already succeeded; a stale cached list
+		// is preferable to failing an otherwise-successful mutation.
+	}
+}
 
 type SortField = 'createdAt' | 'price' | 'likesCount';
 
@@ -59,13 +69,21 @@ type ProductInput = {
 export const createProduct = async (data: ProductInput, file?: Express.Multer.File) => {
 	const product = await prisma.product.create({ data });
 
-	if (!file) return product;
+	if (!file) {
+		await invalidateProductListCache();
+		return product;
+	}
 
 	try {
 		const ext = file.originalname.split('.').pop();
 		const key = `products/${product.id}/${crypto.randomUUID()}.${ext}`;
 		const imageUrl = await uploadFile(key, file.buffer, file.mimetype);
-		return prisma.product.update({ where: { id: product.id }, data: { imageUrl } });
+		const updated = await prisma.product.update({
+			where: { id: product.id },
+			data: { imageUrl },
+		});
+		await invalidateProductListCache();
+		return updated;
 	} catch {
 		await prisma.product.delete({ where: { id: product.id } });
 		throw new CustomError(500, 'Image upload failed. Product was not created.');
@@ -138,7 +156,9 @@ export const getProductById = async (id: number) => {
 export const updateProduct = async (id: number, data: Partial<ProductInput>) => {
 	const product = await prisma.product.findUnique({ where: { id } });
 	if (!product) throw new CustomError(404, 'Product not found.');
-	return prisma.product.update({ where: { id }, data });
+	const updated = await prisma.product.update({ where: { id }, data });
+	await invalidateProductListCache();
+	return updated;
 };
 
 export const deactivateProduct = async (id: number) => {
@@ -150,7 +170,12 @@ export const deactivateProduct = async (id: number) => {
 		await deleteR2File(key);
 	}
 
-	return prisma.product.update({ where: { id }, data: { isActive: false, imageUrl: null } });
+	const updated = await prisma.product.update({
+		where: { id },
+		data: { isActive: false, imageUrl: null },
+	});
+	await invalidateProductListCache();
+	return updated;
 };
 
 export const deleteProductImage = async (id: number) => {
@@ -161,7 +186,9 @@ export const deleteProductImage = async (id: number) => {
 	const key = product.imageUrl.replace(`${process.env.R2_PUBLIC_URL!}/`, '');
 	await deleteR2File(key);
 
-	return prisma.product.update({ where: { id }, data: { imageUrl: null } });
+	const updated = await prisma.product.update({ where: { id }, data: { imageUrl: null } });
+	await invalidateProductListCache();
+	return updated;
 };
 
 export const uploadProductImage = async (id: number, file: Express.Multer.File) => {
@@ -177,20 +204,24 @@ export const uploadProductImage = async (id: number, file: Express.Multer.File) 
 	const key = `products/${id}/${crypto.randomUUID()}.${ext}`;
 	const imageUrl = await uploadFile(key, file.buffer, file.mimetype);
 
-	return prisma.product.update({ where: { id }, data: { imageUrl } });
+	const updated = await prisma.product.update({ where: { id }, data: { imageUrl } });
+	await invalidateProductListCache();
+	return updated;
 };
 
 export const likeProduct = async (productId: number, userId: number) => {
 	const product = await prisma.product.findUnique({ where: { id: productId } });
 	if (!product || !product.isActive) throw new CustomError(404, 'Product not found.');
 
-	return prisma.$transaction(async (tx) => {
+	const updated = await prisma.$transaction(async (tx) => {
 		await tx.like.create({ data: { productId, userId } });
 		return tx.product.update({
 			where: { id: productId },
 			data: { likesCount: { increment: 1 } },
 		});
 	});
+	await invalidateProductListCache();
+	return updated;
 };
 
 export const unlikeProduct = async (productId: number, userId: number) => {
@@ -199,11 +230,13 @@ export const unlikeProduct = async (productId: number, userId: number) => {
 	});
 	if (!like) throw new CustomError(404, 'Like not found.');
 
-	return prisma.$transaction(async (tx) => {
+	const updated = await prisma.$transaction(async (tx) => {
 		await tx.like.delete({ where: { id: like.id } });
 		return tx.product.update({
 			where: { id: productId },
 			data: { likesCount: { decrement: 1 } },
 		});
 	});
+	await invalidateProductListCache();
+	return updated;
 };

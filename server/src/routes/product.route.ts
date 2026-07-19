@@ -5,10 +5,16 @@ import * as productSchemas from '../schemas/product.schema.js';
 import { isAuth } from '../middleware/isAuthenticated.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { uploadImage } from '../middleware/upload.js';
+import { redisCache } from '../middleware/redisCache.js';
 
 const router = Router();
 
-router.get('/', validateQuery(productSchemas.productQuerySchema), productController.getProducts);
+router.get(
+	'/',
+	validateQuery(productSchemas.productQuerySchema),
+	redisCache(60),
+	productController.getProducts,
+);
 router.get('/:id', productController.getProductById);
 router.post(
 	'/',
