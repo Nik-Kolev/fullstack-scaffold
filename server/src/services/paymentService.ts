@@ -83,16 +83,21 @@ export const createCheckoutSession = async (
 
 		if (!session.url) throw new CustomError(500, 'Failed to create Stripe checkout session.');
 
-		await prisma.payment.create({
-			data: {
-				userId,
-				stripeSessionId: session.id,
-				amountTotal,
-				quantity,
-				currency: 'eur',
-				description: description ?? null,
-			},
-		});
+		try {
+			await prisma.payment.create({
+				data: {
+					userId,
+					stripeSessionId: session.id,
+					amountTotal,
+					quantity,
+					currency: 'eur',
+					description: description ?? null,
+				},
+			});
+		} catch (err) {
+			await stripe.checkout.sessions.expire(session.id).catch(() => {});
+			throw err;
+		}
 
 		return { url: session.url };
 	} finally {
@@ -107,37 +112,43 @@ export const updatePaymentBySessionId = async (
 		stripePaymentIntentId?: string;
 	},
 ) => {
-	const payment = await prisma.payment.findUnique({
-		where: { stripeSessionId: sessionId },
-	});
-
-	if (!payment) throw new CustomError(404, 'Payment not found.');
-	if (payment.status !== 'PENDING') return;
-
-	return prisma.payment.update({
-		where: { id: payment.id },
+	const updated = await prisma.payment.updateMany({
+		where: { stripeSessionId: sessionId, status: 'PENDING' },
 		data,
 	});
+
+	if (updated.count > 0) return;
+
+	const exists = await prisma.payment.findUnique({ where: { stripeSessionId: sessionId } });
+	if (!exists) throw new CustomError(404, 'Payment not found.', 'PAYMENT_NOT_FOUND');
 };
 
 export const updatePaymentByPaymentIntentId = async (
 	paymentIntentId: string,
 	data: {
-		status: 'REFUNDED' | 'PARTIALLY_REFUNDED';
-		refundedAt: Date;
-		refundedAmountTotal: number;
+		status: 'REFUNDED' | 'PARTIALLY_REFUNDED' | 'DISPUTED';
+		refundedAt?: Date;
+		refundedAmountTotal?: number;
 	},
 ) => {
-	const payment = await prisma.payment.findUnique({
-		where: { stripePaymentIntentId: paymentIntentId },
-	});
-
-	if (!payment) throw new CustomError(404, 'Payment not found.');
-	if (payment.status === 'REFUNDED') return;
-	if ((payment.refundedAmountTotal ?? 0) >= data.refundedAmountTotal) return;
-
-	return prisma.payment.update({
-		where: { id: payment.id },
+	const updated = await prisma.payment.updateMany({
+		where: {
+			stripePaymentIntentId: paymentIntentId,
+			status: { not: 'REFUNDED' },
+			...(data.refundedAmountTotal !== undefined && {
+				OR: [
+					{ refundedAmountTotal: null },
+					{ refundedAmountTotal: { lt: data.refundedAmountTotal } },
+				],
+			}),
+		},
 		data,
 	});
+
+	if (updated.count > 0) return;
+
+	const exists = await prisma.payment.findUnique({
+		where: { stripePaymentIntentId: paymentIntentId },
+	});
+	if (!exists) throw new CustomError(404, 'Payment not found.', 'PAYMENT_NOT_FOUND');
 };
