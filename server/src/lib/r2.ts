@@ -24,6 +24,13 @@ export async function uploadFile(key: string, buffer: Buffer, mimeType: string):
 	return `${process.env.R2_PUBLIC_URL}/${key}`;
 }
 
+// null when the URL isn't ours to delete (an externally-hosted imageUrl) — callers skip the delete.
+export function keyFromPublicUrl(url: string): string | null {
+	const prefix = `${process.env.R2_PUBLIC_URL}/`;
+
+	return url.startsWith(prefix) ? url.slice(prefix.length) : null;
+}
+
 export async function deleteFile(key: string): Promise<void> {
 	await r2.send(
 		new DeleteObjectCommand({

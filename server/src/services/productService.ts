@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
-import { uploadFile, deleteFile as deleteR2File } from '../lib/r2.js';
+import { uploadFile, deleteFile as deleteR2File, keyFromPublicUrl } from '../lib/r2.js';
 import { invalidateListCache, invalidateDetailCache } from '../lib/redis.js';
 import CustomError from '../utils/customError.js';
 import { assertMatchesDeclaredType, extensionForMimeType } from '../utils/fileValidation.js';
@@ -160,8 +160,8 @@ export const getProducts = async (params: GetProductsParams) => {
 };
 
 export const getProductById = async (id: number) => {
-	const product = await prisma.product.findUnique({ where: { id } });
-	if (!product) throw new CustomError(404, 'Product not found.');
+	const product = await prisma.product.findFirst({ where: { id, isActive: true } });
+	if (!product) throw new CustomError(404, 'Product not found.', 'PRODUCT_NOT_FOUND');
 	return product;
 };
 
@@ -178,8 +178,8 @@ export const deactivateProduct = async (id: number) => {
 	if (!product) throw new CustomError(404, 'Product not found.');
 
 	if (product.imageUrl) {
-		const key = product.imageUrl.replace(`${process.env.R2_PUBLIC_URL!}/`, '');
-		await deleteR2File(key);
+		const key = keyFromPublicUrl(product.imageUrl);
+		if (key) await deleteR2File(key);
 	}
 
 	const updated = await prisma.product.update({
@@ -195,8 +195,8 @@ export const deleteProductImage = async (id: number) => {
 	if (!product) throw new CustomError(404, 'Product not found.');
 	if (!product.imageUrl) throw new CustomError(404, 'Product has no image.');
 
-	const key = product.imageUrl.replace(`${process.env.R2_PUBLIC_URL!}/`, '');
-	await deleteR2File(key);
+	const key = keyFromPublicUrl(product.imageUrl);
+	if (key) await deleteR2File(key);
 
 	const updated = await prisma.product.update({ where: { id }, data: { imageUrl: null } });
 	await invalidateProductCache(id);
@@ -209,16 +209,20 @@ export const uploadProductImage = async (id: number, file: Express.Multer.File) 
 
 	assertMatchesDeclaredType(file);
 
-	if (product.imageUrl) {
-		const oldKey = product.imageUrl.replace(`${process.env.R2_PUBLIC_URL!}/`, '');
-		await deleteR2File(oldKey);
-	}
-
 	const ext = extensionForMimeType(file.mimetype);
 	const key = `products/${id}/${crypto.randomUUID()}.${ext}`;
-	const imageUrl = await uploadFile(key, file.buffer, file.mimetype);
 
+	const imageUrl = await uploadFile(key, file.buffer, file.mimetype);
 	const updated = await prisma.product.update({ where: { id }, data: { imageUrl } });
+
+	const previousKey = product.imageUrl && keyFromPublicUrl(product.imageUrl);
+	if (previousKey) {
+		// Non-fatal, and after the commit: an orphaned object beats a dangling imageUrl.
+		await deleteR2File(previousKey).catch((err) => {
+			console.error(`Failed to delete replaced product image for product ${id}:`, err);
+		});
+	}
+
 	await invalidateProductCache(id);
 	return updated;
 };

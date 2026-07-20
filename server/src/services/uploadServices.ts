@@ -6,10 +6,10 @@ import { assertMatchesDeclaredType, extensionForMimeType } from '../utils/fileVa
 import CustomError from '../utils/customError.js';
 
 export const uploadFiles = async (userId: number, folder: string, data: Express.Multer.File[]) => {
+	data.forEach(assertMatchesDeclaredType);
+
 	const results = await Promise.allSettled(
 		data.map(async (file) => {
-			assertMatchesDeclaredType(file);
-
 			const ext = extensionForMimeType(file.mimetype);
 			const key = `${userId}/${folder}/${crypto.randomUUID()}.${ext}`;
 			const url = await uploadFile(key, file.buffer, file.mimetype);
@@ -47,9 +47,21 @@ export const uploadFiles = async (userId: number, folder: string, data: Express.
 	}
 
 	const fileData = succeeded.map((r) => r.value);
-	await prisma.userFile.createMany({
-		data: fileData,
-	});
+
+	try {
+		await prisma.userFile.createMany({
+			data: fileData,
+		});
+	} catch (err) {
+		await Promise.all(
+			fileData.map((f) =>
+				deleteR2File(f.key).catch((e) => {
+					console.error(`Failed to roll back orphaned upload ${f.key}:`, e);
+				}),
+			),
+		);
+		throw err;
+	}
 
 	return fileData;
 };
@@ -58,7 +70,7 @@ export const deleteFile = async (userId: number, key: string) => {
 	const file = await prisma.userFile.findUnique({ where: { key } });
 
 	if (!file || file.userId !== userId) {
-		throw new CustomError(404, 'File not found.');
+		throw new CustomError(404, 'File not found.', 'FILE_NOT_FOUND');
 	}
 
 	await deleteR2File(key);

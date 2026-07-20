@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import * as productService from '../services/productService.js';
+import type { ProductQuery } from '../schemas/product.schema.js';
 import CustomError from '../utils/customError.js';
 
 export const createProduct = async (req: Request, res: Response) => {
@@ -8,19 +9,7 @@ export const createProduct = async (req: Request, res: Response) => {
 };
 
 export const getProducts = async (req: Request, res: Response) => {
-	const query = req.query as Record<string, string | undefined>;
-	const result = await productService.getProducts({
-		cursor: query.cursor,
-		limit: Number(query.limit ?? 10),
-		categoryId: query.categoryId ? Number(query.categoryId) : undefined,
-		minPrice: query.minPrice ? Number(query.minPrice) : undefined,
-		maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
-		color: query.color,
-		shape: query.shape,
-		search: query.search,
-		sortBy: query.sortBy as 'price' | 'likesCount' | undefined,
-		order: (query.order as 'asc' | 'desc') ?? 'desc',
-	});
+	const result = await productService.getProducts(req.validatedQuery as ProductQuery);
 	res.status(200).json(result);
 };
 

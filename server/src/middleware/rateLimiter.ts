@@ -5,7 +5,7 @@ import CustomError from '../utils/customError.js';
 import redis from '../lib/redis.js';
 
 const handler = (_req: Request, _res: Response, next: NextFunction) => {
-	next(new CustomError(429, 'Too many requests, please try again later.'));
+	next(new CustomError(429, 'Too many requests, please try again later.', 'RATE_LIMITED'));
 };
 
 const skip = () => process.env.NODE_ENV !== 'production';

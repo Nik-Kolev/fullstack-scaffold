@@ -73,9 +73,11 @@ export function errorHandler(
 	} else if (error instanceof TokenExpiredError) {
 		message = 'Session expired. Please log in again.';
 		statusCode = 401;
+		code = 'TOKEN_EXPIRED';
 	} else if (error instanceof JsonWebTokenError) {
 		message = 'Invalid token.';
 		statusCode = 401;
+		code = 'INVALID_TOKEN';
 	} else if (error instanceof Prisma.PrismaClientKnownRequestError) {
 		const mapped = PRISMA_ERROR_MAP[error.code];
 		if (mapped) {

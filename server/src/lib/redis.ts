@@ -13,6 +13,8 @@ const redis = new Redis(process.env.REDIS_URL);
 
 export default redis;
 
+export const tokensValidAfterKey = (userId: number) => `auth:valid-after:${userId}`;
+
 // Atomic "delete only if the token still matches" — a plain GET+compare+DEL
 // isn't atomic and could delete a different holder's lock after our own expired.
 const UNLOCK_SCRIPT = `
@@ -49,14 +51,20 @@ async function scanKeys(pattern: string): Promise<string[]> {
 	return found;
 }
 
-// A bare wildcard here would also match `cache:/api/product/42` — split list vs. single-id invalidation so editing one product doesn't evict every other product's cached detail page.
+// No TTL, unlike every other key here: it has to outlive any in-flight read, and that
+// duration is unbounded. If it expired, a slow read spanning the expiry would repopulate
+// the cache with pre-mutation data. See redisCache.ts for the check that reads it.
+const markInvalidated = () => redis.set('cache:invalidated-at', Date.now());
+
+// Split from invalidateDetailCache because `cache:/api/product*` would also match
+// `cache:/api/product/42` — one edit would evict every product's detail entry.
 export async function invalidateListCache(basePath: string) {
 	const queryVariants = await scanKeys(`cache:${basePath}\\?*`);
 	await redis.del(`cache:${basePath}`, ...queryVariants);
-	await redis.set('cache:invalidated-at', Date.now());
+	await markInvalidated();
 }
 
 export async function invalidateDetailCache(path: string) {
 	await redis.del(`cache:${path}`);
-	await redis.set('cache:invalidated-at', Date.now());
+	await markInvalidated();
 }

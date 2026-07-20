@@ -10,8 +10,8 @@ const router = Router();
 
 router.post(
 	'/',
-	uploadLimiter,
 	isAuth,
+	uploadLimiter,
 	upload.array('files', 10),
 	validateBody(uploadSchemas.folderNameSchema),
 	uploadController.uploadFiles,
