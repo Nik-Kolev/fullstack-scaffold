@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
-import { emailQueue } from '../lib/bullmq.js';
+import { emailQueue, tokenCleanupQueue } from '../lib/bullmq.js';
 import emailWorker, { handleEmailJob } from '../workers/email.worker.js';
-import { handleTokenCleanupJob } from '../workers/tokenCleanup.worker.js';
+import tokenCleanupWorker, { handleTokenCleanupJob } from '../workers/tokenCleanup.worker.js';
 import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { redisConnectionOptions } from '../lib/redis.js';
 import { sendEmail } from '../lib/resend.js';
@@ -28,9 +28,10 @@ describe('email worker', () => {
 	});
 
 	afterAll(async () => {
-		// Only closes the connection — never obliterates the shared 'emails' queue other files still use.
 		await emailWorker.close();
+		await tokenCleanupWorker.close();
 		await emailQueue.close();
+		await tokenCleanupQueue.close();
 		await e2eWorker.close();
 		await e2eQueueEvents.close();
 		await e2eQueue.obliterate({ force: true });

@@ -2,13 +2,17 @@ import request from 'supertest';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isAuth } from '../middleware/isAuthenticated.js';
 
 import { requireRole } from '../middleware/requireRole.js';
 import { authLimiter, uploadLimiter, checkoutLimiter } from '../middleware/rateLimiter.js';
 import { errorHandler } from '../middleware/errorHandler.js';
 import redis from '../lib/redis.js';
+
+beforeEach(async () => {
+	await redis.del('auth:valid-after:1');
+});
 
 afterAll(async () => {
 	await redis.quit();
@@ -56,6 +60,7 @@ describe('isAuthenticated middleware', () => {
 	it('returns 401 for a malformed token', async () => {
 		const res = await request(app).get('/protected').set('Authorization', 'Bearer garbage');
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('INVALID_TOKEN');
 	});
 
 	it('returns 401 for an expired token', async () => {
@@ -63,6 +68,7 @@ describe('isAuthenticated middleware', () => {
 			.get('/protected')
 			.set('Authorization', `Bearer ${expiredToken()}`);
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('TOKEN_EXPIRED');
 	});
 
 	it('passes through and populates req.user for a valid token', async () => {
@@ -82,12 +88,28 @@ describe('isAuthenticated middleware', () => {
 		const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
 
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('TOKEN_REVOKED');
 	});
 
 	it('returns 401 for a non-Bearer authorization scheme', async () => {
 		const token = makeToken();
 		const res = await request(app).get('/protected').set('Authorization', `Basic ${token}`);
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('NO_TOKEN');
+	});
+
+	it('returns 401 for a token issued before a password change cut it off', async () => {
+		const token = makeToken('user');
+		const { userId } = jwt.decode(token) as { userId: number };
+		const key = `auth:valid-after:${userId}`;
+		await redis.setex(key, 900, Math.floor(Date.now() / 1000) + 60);
+
+		const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
+
+		await redis.del(key);
+
+		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('TOKEN_REVOKED');
 	});
 
 	it('returns 401 for an empty Bearer token', async () => {
@@ -136,6 +158,7 @@ describe('requireRole middleware', () => {
 		);
 		const res = await request(app).get('/admin').set('Authorization', `Bearer ${noRoleToken}`);
 		expect(res.status).toBe(403);
+		expect(res.body.code).toBe('FORBIDDEN');
 	});
 });
 
@@ -155,7 +178,7 @@ describe('authLimiter', () => {
 		limiterApp.use(errorHandler);
 	});
 
-	afterAll(() => {
+	afterEach(() => {
 		process.env.NODE_ENV = originalNodeEnv;
 	});
 
@@ -191,7 +214,7 @@ describe('uploadLimiter', () => {
 		limiterApp.use(errorHandler);
 	});
 
-	afterAll(() => {
+	afterEach(() => {
 		process.env.NODE_ENV = originalNodeEnv;
 	});
 
@@ -234,7 +257,7 @@ describe('checkoutLimiter', () => {
 		if (keys.length) await redis.del(...keys);
 	});
 
-	afterAll(() => {
+	afterEach(() => {
 		process.env.NODE_ENV = originalNodeEnv;
 	});
 

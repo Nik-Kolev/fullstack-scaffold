@@ -175,7 +175,29 @@ Key contracts to know when writing frontend service calls:
 
 Every error response is `{ statusCode, code, details }` — no `message` field. `code` is the stable, machine-readable value to dispatch UI copy off (never display raw server text — see `zod.md`'s client rules). `details` is only ever populated for `VALIDATION_ERROR` (a `[{ field, message }]` array); every other code sends `details: undefined` since the code alone already implies which field/flow is affected.
 
-Named codes in use so far: `VALIDATION_ERROR` (any Zod shape mismatch, all routes), `INVALID_CREDENTIALS` (login), `EMAIL_TAKEN` (register), `INVALID_RESET_TOKEN` (reset-password), `ALREADY_LIKED` (`POST /product/:id/like` on a duplicate). Routes without a named code yet (e.g. change-password) still return `{ statusCode }` with `code: undefined` — fall back to a generic message for those.
+Named codes in use so far:
+
+| Code                                                                      | Where                                                                   |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `VALIDATION_ERROR`                                                        | any Zod shape mismatch, all routes                                      |
+| `INVALID_CREDENTIALS`                                                     | login                                                                   |
+| `EMAIL_TAKEN`                                                             | register                                                                |
+| `INVALID_RESET_TOKEN`                                                     | reset-password                                                          |
+| `ALREADY_LIKED`                                                           | `POST /product/:id/like` on a duplicate                                 |
+| `NO_TOKEN` / `INVALID_TOKEN` / `TOKEN_EXPIRED` / `TOKEN_REVOKED`          | `isAuth` — missing, malformed, expired, or cut off by a password change |
+| `FORBIDDEN`                                                               | `requireRole`                                                           |
+| `RATE_LIMITED`                                                            | any limiter                                                             |
+| `NO_REFRESH_TOKEN` / `INVALID_REFRESH_TOKEN` / `SESSION_INVALID`          | `POST /auth/refresh`                                                    |
+| `CURRENT_PASSWORD_REQUIRED` / `INVALID_CURRENT_PASSWORD`                  | change-password                                                         |
+| `OAUTH_STATE_MISMATCH` / `INVALID_OAUTH_CODE` / `GOOGLE_EMAIL_UNVERIFIED` | Google OAuth                                                            |
+| `PRODUCT_NOT_FOUND` / `FILE_NOT_FOUND` / `PAYMENT_NOT_FOUND`              | product, upload, payment lookups                                        |
+| `R2_URL_MISMATCH`                                                         | stored `imageUrl` doesn't match `R2_PUBLIC_URL`                         |
+
+`TOKEN_REVOKED` covers both a blacklisted `jti` and a token issued before the user's `auth:valid-after` cutoff — the client treats both as "log in again".
+
+### Stripe webhook events handled
+
+`checkout.session.completed` and `checkout.session.async_payment_succeeded` (both gated on `payment_status === 'paid'`), `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`, `charge.dispute.created` (→ `DISPUTED`), and `payment_intent.payment_failed` (logged). Every event id is recorded in `processed_stripe_events` so a redelivery is skipped.
 
 ### Auth
 

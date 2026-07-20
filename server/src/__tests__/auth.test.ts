@@ -7,6 +7,7 @@ import redis from '../lib/redis.js';
 import { isAuth } from '../middleware/isAuthenticated.js';
 import { errorHandler } from '../middleware/errorHandler.js';
 import * as JWT from '../lib/jwt.js';
+import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { emailQueue } from '../lib/bullmq.js';
 
@@ -27,7 +28,9 @@ vi.mock('googleapis', () => ({
 				return {
 					getToken: vi.fn().mockRejectedValue(new Error('invalid_grant')),
 					setCredentials: vi.fn(),
-					generateAuthUrl: vi.fn(),
+					generateAuthUrl: vi
+						.fn()
+						.mockReturnValue('https://accounts.google.com/o/oauth2/v2/auth'),
 				};
 			}),
 		},
@@ -222,15 +225,42 @@ describe('POST /api/auth/refresh', () => {
 		expect(res.status).toBe(401);
 	});
 
-	it('returns 401 on refresh token reuse (rotation enforced)', async () => {
+	it('serves the successor session when a rotated token is reused inside the grace window', async () => {
+		await register();
+		const loginRes = await login();
+		const cookie = getCookies(loginRes).join('; ');
+
+		const first = await request(app).post('/api/auth/refresh').set('Cookie', cookie);
+		const reuse = await request(app).post('/api/auth/refresh').set('Cookie', cookie);
+
+		expect(first.status).toBe(200);
+		expect(reuse.status).toBe(200);
+		expect(reuse.body.accessToken).toBeDefined();
+	});
+
+	it('returns 401 when a rotated token is reused after the grace window', async () => {
 		await register();
 		const loginRes = await login();
 		const cookie = getCookies(loginRes).join('; ');
 
 		await request(app).post('/api/auth/refresh').set('Cookie', cookie);
+
+		await prisma.refreshToken.updateMany({
+			where: { rotatedAt: { not: null } },
+			data: { rotatedAt: new Date(Date.now() - 60_000) },
+		});
+
 		const res = await request(app).post('/api/auth/refresh').set('Cookie', cookie);
 
 		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('INVALID_REFRESH_TOKEN');
+	});
+
+	it('rejects a refresh with no cookie using a named code', async () => {
+		const res = await request(app).post('/api/auth/refresh');
+
+		expect(res.status).toBe(401);
+		expect(res.body.code).toBe('NO_REFRESH_TOKEN');
 	});
 
 	it('does not return the same accessToken after refresh', async () => {
@@ -579,6 +609,37 @@ describe('POST /api/auth/reset-password', () => {
 		expect(res.body.user).not.toHaveProperty('password');
 	});
 
+	it('revokes access tokens issued before the reset', async () => {
+		await register();
+		const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+
+		const staleToken = jwt.sign(
+			{
+				userId: user!.id,
+				email: user!.email,
+				role: user!.role,
+				jti: crypto.randomUUID(),
+				iat: Math.floor(Date.now() / 1000) - 60,
+			},
+			process.env.JWT_ACCESS_SECRET!,
+			{ expiresIn: '15m' },
+		);
+
+		const before = await request(protectedApp)
+			.get('/protected')
+			.set('Authorization', `Bearer ${staleToken}`);
+		expect(before.status).toBe(200);
+
+		await resetPassword(await createResetToken(user!.id), 'NewPass5678');
+
+		const after = await request(protectedApp)
+			.get('/protected')
+			.set('Authorization', `Bearer ${staleToken}`);
+
+		expect(after.status).toBe(401);
+		expect(after.body.code).toBe('TOKEN_REVOKED');
+	});
+
 	it('sets a new refreshToken cookie', async () => {
 		const token = await getResetToken();
 		const res = await resetPassword(token, 'NewPass5678');
@@ -830,11 +891,51 @@ describe('POST /api/auth/google/exchange', () => {
 
 describe('GET /api/auth/google/callback', () => {
 	it('redirects back into the popup with ?error=1 instead of raw JSON when the exchange fails', async () => {
-		const res = await request(app).get('/api/auth/google/callback?code=bad-code');
+		const res = await request(app)
+			.get('/api/auth/google/callback?code=bad-code&state=abc')
+			.set('Cookie', 'oauthState=abc');
 
 		expect(res.status).toBe(302);
 		const location = res.headers.location as string;
 		expect(location).toContain('/auth/callback');
 		expect(location).toContain('error=1');
+	});
+
+	it('rejects a callback whose state does not match the cookie', async () => {
+		const res = await request(app)
+			.get('/api/auth/google/callback?code=any-code&state=attacker-state')
+			.set('Cookie', 'oauthState=victim-state');
+
+		expect(res.status).toBe(302);
+		expect(res.headers.location as string).toContain('error=1');
+	});
+
+	it('rejects a callback with no state cookie at all', async () => {
+		const res = await request(app).get('/api/auth/google/callback?code=any-code&state=abc');
+
+		expect(res.status).toBe(302);
+		expect(res.headers.location as string).toContain('error=1');
+	});
+
+	it('clears the state cookie on the callback so it cannot be replayed', async () => {
+		const res = await request(app)
+			.get('/api/auth/google/callback?code=any-code&state=abc')
+			.set('Cookie', 'oauthState=abc');
+
+		expect(getCookies(res).some((c) => c.startsWith('oauthState=;'))).toBe(true);
+	});
+});
+
+describe('GET /api/auth/google', () => {
+	it('sets a state cookie before redirecting to Google', async () => {
+		const res = await request(app).get('/api/auth/google');
+
+		expect(res.status).toBe(302);
+
+		const stateCookie = getCookies(res).find((c) => c.startsWith('oauthState='));
+		expect(stateCookie).toBeDefined();
+		expect(stateCookie).toContain('HttpOnly');
+
+		expect(stateCookie).toContain('SameSite=Lax');
 	});
 });

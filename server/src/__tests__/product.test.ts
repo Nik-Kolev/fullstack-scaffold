@@ -15,7 +15,8 @@ vi.mock('../lib/stripe.js', () => ({
 	},
 }));
 
-vi.mock('../lib/r2.js', () => ({
+vi.mock('../lib/r2.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('../lib/r2.js')>()),
 	uploadFile: vi.fn(),
 	deleteFile: vi.fn(),
 	default: {},
@@ -483,12 +484,11 @@ describe('GET /api/product/:id', () => {
 		expect(res.status).toBe(404);
 	});
 
-	it('returns inactive product by id — allows admin lookup of deactivated products', async () => {
+	it('returns 404 for a deactivated product', async () => {
 		const inactive = await seedProduct({ isActive: false });
 
 		const res = await request(app).get(`/api/product/${inactive.id}`);
-		expect(res.status).toBe(200);
-		expect(res.body.product.isActive).toBe(false);
+		expect(res.status).toBe(404);
 	});
 });
 
@@ -497,14 +497,14 @@ describe('GET /api/product/:id', () => {
 describe('GET /api/product/:id caching', () => {
 	it('serves an identical second request from cache without hitting the DB again', async () => {
 		const product = await seedProduct();
-		const findUniqueSpy = vi.spyOn(prisma.product, 'findUnique');
+		const findFirstSpy = vi.spyOn(prisma.product, 'findFirst');
 
 		const first = await request(app).get(`/api/product/${product.id}`);
 		const second = await request(app).get(`/api/product/${product.id}`);
 
-		expect(findUniqueSpy).toHaveBeenCalledTimes(1);
+		expect(findFirstSpy).toHaveBeenCalledTimes(1);
 		expect(second.body).toEqual(first.body);
-		findUniqueSpy.mockRestore();
+		findFirstSpy.mockRestore();
 	});
 
 	it('stores the response under cache:<url> with the configured TTL', async () => {
@@ -943,7 +943,7 @@ describe('POST /api/product/:id/image', () => {
 		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/uuid.jpg');
 	});
 
-	it('deletes old R2 image before uploading the replacement', async () => {
+	it('deletes the old R2 image only after the replacement is committed', async () => {
 		mockUploadFile.mockResolvedValueOnce('https://r2.example.com/products/1/new.jpg');
 		const token = await registerAndLoginAsAdmin();
 		const product = await seedProduct({
@@ -959,9 +959,32 @@ describe('POST /api/product/:id/image', () => {
 			});
 
 		expect(mockDeleteFile).toHaveBeenCalledOnce();
+		expect(mockDeleteFile).toHaveBeenCalledWith('products/1/old.jpg');
 
 		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
 		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/new.jpg');
+	});
+
+	it('keeps the existing image intact when the replacement upload fails', async () => {
+		mockUploadFile.mockRejectedValueOnce(new Error('R2 unavailable'));
+		const token = await registerAndLoginAsAdmin();
+		const product = await seedProduct({
+			imageUrl: 'https://r2.example.com/products/1/old.jpg',
+		});
+
+		const res = await request(app)
+			.post(`/api/product/${product.id}/image`)
+			.set('Authorization', `Bearer ${token}`)
+			.attach('image', JPEG_BUFFER, {
+				filename: 'new.jpg',
+				contentType: 'image/jpeg',
+			});
+
+		expect(res.status).toBe(500);
+
+		expect(mockDeleteFile).not.toHaveBeenCalled();
+		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
+		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/old.jpg');
 	});
 
 	it('returns 400 for spoofed replacement content and does not delete the existing image', async () => {
@@ -984,7 +1007,8 @@ describe('POST /api/product/:id/image', () => {
 		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/old.jpg');
 	});
 
-	it('returns 500 and preserves old imageUrl when deleteFile rejects during image replacement', async () => {
+	it('still succeeds with the new image when deleting the replaced object fails', async () => {
+		mockUploadFile.mockResolvedValueOnce('https://r2.example.com/products/1/new.jpg');
 		mockDeleteFile.mockRejectedValueOnce(new Error('R2 unavailable'));
 		const token = await registerAndLoginAsAdmin();
 		const product = await seedProduct({
@@ -999,9 +1023,9 @@ describe('POST /api/product/:id/image', () => {
 				contentType: 'image/jpeg',
 			});
 
-		expect(res.status).toBe(500);
+		expect(res.status).toBe(200);
 		const inDb = await prisma.product.findUnique({ where: { id: product.id } });
-		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/old.jpg');
+		expect(inDb?.imageUrl).toBe('https://r2.example.com/products/1/new.jpg');
 	});
 });
 

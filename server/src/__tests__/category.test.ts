@@ -1,7 +1,10 @@
 import request from 'supertest';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import app from '../app.js';
 import prisma from '../lib/prisma.js';
+import redis from '../lib/redis.js';
+
+vi.mock('../lib/bullmq.js', () => ({ emailQueue: { add: vi.fn() } }));
 
 beforeEach(async () => {
 	await prisma.like.deleteMany();
@@ -11,6 +14,7 @@ beforeEach(async () => {
 
 afterAll(async () => {
 	await prisma.$disconnect();
+	await redis.quit();
 });
 
 // ─── GET /api/category ───────────────────────────────────────────────────────

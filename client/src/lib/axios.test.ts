@@ -21,6 +21,7 @@ async function loadAxiosModule() {
     default: {
       create: vi.fn(() => mockApi),
       post,
+      isAxiosError: (e: unknown) => !!(e as { response?: unknown })?.response,
     },
   }))
 
@@ -135,9 +136,7 @@ describe('lib/axios response interceptor', () => {
     setAccessToken('stale-token')
     post.mockRejectedValueOnce(new Error('refresh failed'))
 
-    await expect(responseErrorHandler(makeError(401, '/product'))).rejects.toThrow(
-      'refresh failed',
-    )
+    await expect(responseErrorHandler(makeError(401, '/product'))).rejects.toThrow('refresh failed')
 
     expect(window.location.href).toBe('/login')
   })
@@ -159,5 +158,49 @@ describe('lib/axios response interceptor', () => {
 
     expect(post).toHaveBeenCalledOnce()
     expect(apiRequest).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears the token and redirects when the retried request 401s again', async () => {
+    const { responseErrorHandler, post, apiRequest, setAccessToken } = await loadAxiosModule()
+    setAccessToken('stale-token')
+    post.mockResolvedValueOnce({ data: { accessToken: 'refreshed-token' } })
+    apiRequest.mockRejectedValueOnce({ response: { status: 401 } })
+
+    await expect(responseErrorHandler(makeError(401, '/product'))).rejects.toEqual({
+      response: { status: 401 },
+    })
+
+    expect(window.location.href).toBe('/login')
+  })
+
+  it('propagates a non-401 failure from the retried request without logging out', async () => {
+    const { responseErrorHandler, post, apiRequest } = await loadAxiosModule()
+    post.mockResolvedValueOnce({ data: { accessToken: 'refreshed-token' } })
+    apiRequest.mockRejectedValueOnce({ response: { status: 500 } })
+
+    await expect(responseErrorHandler(makeError(401, '/product'))).rejects.toEqual({
+      response: { status: 500 },
+    })
+
+    expect(window.location.href).not.toBe('/login')
+  })
+
+  it('marks queued requests as retried so a second 401 cannot start another refresh', async () => {
+    const { responseErrorHandler, post } = await loadAxiosModule()
+    let resolveRefresh!: (value: { data: { accessToken: string } }) => void
+    post.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRefresh = resolve
+      }),
+    )
+
+    const leader = responseErrorHandler(makeError(401, '/product'))
+    const follower = makeError(401, '/user/me')
+    const queued = responseErrorHandler(follower)
+
+    resolveRefresh({ data: { accessToken: 'queued-token' } })
+    await Promise.all([leader, queued])
+
+    expect((follower.config as { _retry?: boolean })._retry).toBe(true)
   })
 })

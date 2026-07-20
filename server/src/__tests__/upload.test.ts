@@ -24,8 +24,9 @@ beforeEach(async () => {
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();
 	await redis.flushdb();
-	vi.mocked(uploadFile).mockClear();
-	vi.mocked(deleteFile).mockClear();
+	// mockReset, not mockClear — mockClear leaves unconsumed *Once implementations queued.
+	vi.mocked(uploadFile).mockReset();
+	vi.mocked(deleteFile).mockReset();
 });
 
 afterAll(async () => {
@@ -171,9 +172,8 @@ describe('POST /api/upload', () => {
 		expect(await prisma.userFile.count()).toBe(0);
 	});
 
-	it('rolls back the R2 upload of a valid file when a later file in the same batch fails content validation', async () => {
+	it('writes nothing to R2 when any file in the batch fails content validation', async () => {
 		const accessToken = await registerAndLogin();
-		vi.mocked(uploadFile).mockResolvedValueOnce('https://fake-public-url.test/1/images/a.png');
 
 		const res = await uploadReq(accessToken)
 			.field('folderName', 'images')
@@ -187,9 +187,26 @@ describe('POST /api/upload', () => {
 			});
 
 		expect(res.status).toBe(400);
-		expect(uploadFile).toHaveBeenCalledOnce();
+		expect(uploadFile).not.toHaveBeenCalled();
+		expect(deleteFile).not.toHaveBeenCalled();
+		expect(await prisma.userFile.count()).toBe(0);
+	});
+
+	it('rolls back objects already in R2 when the database write fails', async () => {
+		const accessToken = await registerAndLogin();
+		const createSpy = vi
+			.spyOn(prisma.userFile, 'createMany')
+			.mockRejectedValueOnce(new Error('database unavailable'));
+
+		const res = await uploadReq(accessToken)
+			.field('folderName', 'images')
+			.attach('files', PNG_BUFFER, { filename: 'a.png', contentType: 'image/png' });
+
+		expect(res.status).toBe(500);
 		expect(deleteFile).toHaveBeenCalledOnce();
 		expect(await prisma.userFile.count()).toBe(0);
+
+		createSpy.mockRestore();
 	});
 
 	it('returns 400 when a file exceeds the 5MB limit', async () => {

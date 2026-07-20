@@ -84,8 +84,33 @@ npm run format            # prettier --write src/**/*.ts
 No CSRF token library is used, and this is a deliberate decision, not an oversight — confirmed independently twice (Phase 2's security-hardening pass, and the Phase 4 reviewer pass over Phases 1-3 combined). Don't re-litigate this from scratch on a future review; the reasoning:
 
 - Every protected route requires a `Bearer` header (`isAuthenticated.ts`) — never auto-attached cross-site by a browser the way a cookie is. There's no cookie-based ambient authority to exploit in the first place, which is what CSRF actually attacks.
-- The one cookie in play, `refreshToken`, is set `sameSite=strict` at all 6 `res.cookie(...)` call sites — the browser won't attach it to a cross-site request at all, strict mode included.
+- The cookie that carries authority, `refreshToken`, is set `sameSite=strict` — the browser won't attach it to a cross-site request at all. It is written in exactly one place, `setRefreshCookie()` in `utils/authCookies.ts`, so the flags cannot drift between call sites.
+- There is a second cookie, `oauthState`, and it is deliberately `sameSite=lax` (see the OAuth state section below). **This does not weaken the posture:** it carries no authority — it's a nonce that is compared and immediately cleared, and the only route that reads it rejects unless the caller also supplies a matching value it cannot obtain. An attacker causing it to be sent gains nothing.
 - CORS (`expressConfig.ts`) is a secondary, complementary layer on top of the above two — it stops a malicious page's JS from _reading_ a response even if a request somehow got through, but it's not the reason CSRF isn't a practical concern here. Don't reach for "add a CSRF token" as the fix if this comes up again — the actual gap, if one is ever found, would be in the Bearer-only/`sameSite` reasoning above, not in CORS.
+
+### Never return a Prisma user object directly — always `toSafeUser`
+
+Prisma has **no global `omit`** configured, so `password` is present on every user object it returns. The only thing keeping it out of responses is `toSafeUser` (`utils/safeUser.ts`), an allowlist that constructs a new object from six named fields.
+
+The rule: **a user object crosses from service to controller only via `toSafeUser`.** Controllers never touch `prisma.user` and never reshape a user themselves. This fails closed — a new column added to the schema is invisible to responses until someone explicitly adds it to `SafeUser`.
+
+Watch relation includes specifically (`include: { user: true }`): they embed the full user, hash included. That's fine for internal use, but the result must never be what gets returned. `resetPassword` does exactly this — reads `user.user.*` internally, returns `toSafeUser(updatedUser)` from the transaction.
+
+`hasPassword` exists as a Prisma result extension for this reason: the client needs to know whether an account has a password set (the OAuth-only case) without the hash ever being in the response shape.
+
+### Cached routes stay role-invariant
+
+Any route behind `redisCache` must return the same body regardless of who asks. `GET /product/:id` therefore filters `isActive: true` for everyone, and admin lookup of deactivated products will be a **separate, uncached, `requireRole`-gated route** — not a branch inside the cached one. Adding role-dependent output to a cached route means the first admin request populates the shared cache and every anonymous visitor is served admin data until the TTL expires. If a cached response ever has to vary, the varying dimension goes in the cache key or the route comes out of the cache.
+
+### OAuth state
+
+`GET /auth/google` mints a random `state`, stores it in the `oauthState` cookie, and `GET /auth/google/callback` rejects any mismatch. Without it an attacker can hand the victim their own `?code=` and silently log the victim into the attacker's account (login CSRF).
+
+**The state cookie is `sameSite: 'lax'`, not `'strict'` like `refreshToken`** — Google's callback is a cross-site top-level navigation, and browsers don't attach a strict cookie to one. Setting it strict makes the cookie absent on every callback, failing OAuth 100% of the time. This is the one deliberate exception to the strict-cookie rule below.
+
+### Access-token revocation
+
+Access tokens are stateless and can't be revoked individually. A password change/reset writes `auth:valid-after:<userId>` to Redis and `isAuth` rejects any token whose `iat` predates it — deleting `RefreshToken` rows alone only stops renewal, leaving already-issued access tokens valid for up to 15 minutes. `iat` is second-granular, so a token minted in the same second as the cutoff survives; that window is inherent to JWT, not a bug.
 
 ### Auth tokens
 

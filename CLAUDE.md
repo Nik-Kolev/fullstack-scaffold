@@ -2,6 +2,24 @@
 
 Reusable fullstack starter. Goal: clean, copy-paste-friendly patterns. Prioritize clarity and good structure.
 
+## The governing rule — read before proposing any work
+
+**This is a scaffold whose purpose is to demonstrate technologies working correctly together. It is not a product being built to completion.**
+
+Every scoping decision follows from that:
+
+- **Breadth beats depth.** One correct, idiomatic example of a technology is the deliverable. A second hardening pass on something already demonstrated is worth less than the next technology that isn't represented at all.
+- **Correct, not bulletproof.** Fix what is actually broken or misleading. Don't build machinery for failure modes this codebase will never meet at its real scale (one developer, demo traffic).
+- **Prefer the smaller fix.** Where two solutions both close a real bug, take the one that adds less surface — fewer tables, fewer migrations, fewer concepts a reader has to hold.
+- **Defer whole features rather than half-building them.** A missing capability noted in `roadmap.md` reads better than a partial one in the code.
+- **Readable to a stranger.** Someone copying this into a new project should understand a file without archaeology. That is the actual product.
+
+**Definition of done for the project:** every technology on the intended list is implemented and demonstrably working for a case or two. Not a complete marketplace — no promotions, wishlists, reviews, or inventory management. If a feature exists only to make the demo feel like a real shop, it doesn't belong.
+
+**Push back at the start of a unit, not after it.** Before writing the first file, say plainly if the unit is bigger than the scaffold needs and name the smaller version. Once something is half-built, finishing it is usually the right call — so the objection is worth nothing if it arrives late. Two units that already outgrew this brief (the product catalog and Stripe) are the reference point for how much is too much.
+
+When a proposal fails this test, say so and offer the smaller version instead of building it.
+
 ## Project docs
 | Purpose | Location |
 |---|---|

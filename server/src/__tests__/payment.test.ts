@@ -45,12 +45,15 @@ function checkoutReq(token: string, body?: object) {
 }
 
 async function sendWebhook(event: Record<string, unknown>) {
-	vi.mocked(stripe.webhooks.constructEvent).mockReturnValueOnce(event as unknown as Stripe.Event);
+	const withId = { id: `evt_${crypto.randomUUID()}`, ...event };
+	vi.mocked(stripe.webhooks.constructEvent).mockReturnValueOnce(
+		withId as unknown as Stripe.Event,
+	);
 	return request(app)
 		.post('/api/payment/webhook')
 		.set('stripe-signature', 'v1=test_sig')
 		.set('Content-Type', 'application/json')
-		.send(JSON.stringify(event));
+		.send(JSON.stringify(withId));
 }
 
 async function seedUser() {
@@ -74,6 +77,7 @@ async function seedPayment(userId: number, overrides: object = {}) {
 
 beforeEach(async () => {
 	await prisma.like.deleteMany();
+	await prisma.processedStripeEvent.deleteMany();
 	await prisma.payment.deleteMany();
 	await prisma.product.deleteMany();
 	await prisma.productCategory.deleteMany();
@@ -397,7 +401,9 @@ describe('POST /api/payment/checkout', () => {
 
 		it('releases the lock after a Stripe error — the next attempt is not stuck behind it', async () => {
 			const { accessToken } = await registerAndLogin();
-			vi.mocked(stripe.checkout.sessions.create).mockRejectedValueOnce(new Error('Stripe down'));
+			vi.mocked(stripe.checkout.sessions.create).mockRejectedValueOnce(
+				new Error('Stripe down'),
+			);
 
 			const failed = await checkoutReq(accessToken);
 			expect(failed.status).toBe(500);
@@ -442,7 +448,11 @@ describe('POST /api/payment/webhook', () => {
 			const res = await sendWebhook({
 				type: 'checkout.session.completed',
 				data: {
-					object: { id: SESSION_ID, payment_intent: PI_ID } as any,
+					object: {
+						id: SESSION_ID,
+						payment_intent: PI_ID,
+						payment_status: 'paid',
+					} as any,
 				},
 			});
 
@@ -454,14 +464,14 @@ describe('POST /api/payment/webhook', () => {
 			expect(updated?.stripePaymentIntentId).toBe(PI_ID);
 		});
 
-		it('updates to SUCCEEDED with no paymentIntentId when payment_intent is null — async payment methods (e.g. SEPA)', async () => {
+		it('updates to SUCCEEDED with no paymentIntentId when payment_intent is null but the session is paid', async () => {
 			const user = await seedUser();
 			const payment = await seedPayment(user.id, { status: 'PENDING' });
 
 			const res = await sendWebhook({
 				type: 'checkout.session.completed',
 				data: {
-					object: { id: SESSION_ID, payment_intent: null } as any,
+					object: { id: SESSION_ID, payment_intent: null, payment_status: 'paid' } as any,
 				},
 			});
 
@@ -469,6 +479,60 @@ describe('POST /api/payment/webhook', () => {
 			const updated = await prisma.payment.findUnique({ where: { id: payment.id } });
 			expect(updated?.status).toBe('SUCCEEDED');
 			expect(updated?.stripePaymentIntentId).toBeNull();
+		});
+
+		it('leaves the payment PENDING when the session completed but is still unpaid', async () => {
+			const user = await seedUser();
+			const payment = await seedPayment(user.id, { status: 'PENDING' });
+
+			const res = await sendWebhook({
+				type: 'checkout.session.completed',
+				data: {
+					object: {
+						id: SESSION_ID,
+						payment_intent: PI_ID,
+						payment_status: 'unpaid',
+					} as any,
+				},
+			});
+
+			expect(res.status).toBe(200);
+			const updated = await prisma.payment.findUnique({ where: { id: payment.id } });
+			expect(updated?.status).toBe('PENDING');
+		});
+
+		it('marks SUCCEEDED when the delayed payment later succeeds', async () => {
+			const user = await seedUser();
+			const payment = await seedPayment(user.id, { status: 'PENDING' });
+
+			const res = await sendWebhook({
+				type: 'checkout.session.async_payment_succeeded',
+				data: {
+					object: {
+						id: SESSION_ID,
+						payment_intent: PI_ID,
+						payment_status: 'paid',
+					} as any,
+				},
+			});
+
+			expect(res.status).toBe(200);
+			const updated = await prisma.payment.findUnique({ where: { id: payment.id } });
+			expect(updated?.status).toBe('SUCCEEDED');
+		});
+
+		it('marks FAILED when the delayed payment later bounces', async () => {
+			const user = await seedUser();
+			const payment = await seedPayment(user.id, { status: 'PENDING' });
+
+			const res = await sendWebhook({
+				type: 'checkout.session.async_payment_failed',
+				data: { object: { id: SESSION_ID, payment_status: 'unpaid' } as any },
+			});
+
+			expect(res.status).toBe(200);
+			const updated = await prisma.payment.findUnique({ where: { id: payment.id } });
+			expect(updated?.status).toBe('FAILED');
 		});
 
 		it('is idempotent for an already-SUCCEEDED payment — does not overwrite stripePaymentIntentId', async () => {
@@ -653,10 +717,56 @@ describe('POST /api/payment/webhook', () => {
 			const res = await sendWebhook({
 				type: 'checkout.session.completed',
 				data: {
-					object: { id: 'cs_ghost_unknown', payment_intent: 'pi_ghost' } as any,
+					object: {
+						id: 'cs_ghost_unknown',
+						payment_intent: 'pi_ghost',
+						payment_status: 'paid',
+					} as any,
 				},
 			});
 			expect(res.status).toBe(404);
+		});
+
+		it('records each event id once so a redelivery is skipped', async () => {
+			const user = await seedUser();
+			await seedPayment(user.id, { status: 'PENDING' });
+
+			const eventId = `evt_${crypto.randomUUID()}`;
+			const event = {
+				id: eventId,
+				type: 'checkout.session.completed',
+				data: {
+					object: {
+						id: SESSION_ID,
+						payment_intent: PI_ID,
+						payment_status: 'paid',
+					} as any,
+				},
+			};
+
+			await sendWebhook(event);
+			const second = await sendWebhook(event);
+
+			expect(second.status).toBe(200);
+			const rows = await prisma.processedStripeEvent.findMany({ where: { eventId } });
+			expect(rows).toHaveLength(1);
+		});
+
+		it('marks a payment DISPUTED when a chargeback is opened', async () => {
+			const user = await seedUser();
+			const payment = await seedPayment(user.id, {
+				status: 'SUCCEEDED',
+				stripePaymentIntentId: PI_ID,
+			});
+
+			const res = await sendWebhook({
+				type: 'charge.dispute.created',
+				data: { object: { payment_intent: PI_ID } as any },
+			});
+
+			expect(res.status).toBe(200);
+			const updated = await prisma.payment.findUnique({ where: { id: payment.id } });
+			expect(updated?.status).toBe('DISPUTED');
 		});
 
 		it('charge.refunded for unknown paymentIntentId → 404', async () => {
@@ -680,7 +790,11 @@ describe('POST /api/payment/webhook', () => {
 			const event: Partial<Stripe.Event> = {
 				type: 'checkout.session.completed',
 				data: {
-					object: { id: SESSION_ID, payment_intent: PI_ID } as any,
+					object: {
+						id: SESSION_ID,
+						payment_intent: PI_ID,
+						payment_status: 'paid',
+					} as any,
 				},
 			};
 
