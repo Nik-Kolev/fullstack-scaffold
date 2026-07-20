@@ -4,7 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- CreateEnum
-CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'SUCCEEDED', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED');
+CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'SUCCEEDED', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'DISPUTED');
 
 -- CreateTable
 CREATE TABLE "password_reset_tokens" (
@@ -32,6 +32,15 @@ CREATE TABLE "payments" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "payments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "processed_stripe_events" (
+    "event_id" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "processed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "processed_stripe_events_pkey" PRIMARY KEY ("event_id")
 );
 
 -- CreateTable
@@ -77,6 +86,8 @@ CREATE TABLE "refresh_tokens" (
     "user_id" INTEGER NOT NULL,
     "expires_at" TIMESTAMP(3) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "rotated_at" TIMESTAMP(3),
+    "replaced_by_id" TEXT,
 
     CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("refresh_token_id")
 );
@@ -136,6 +147,9 @@ CREATE INDEX "products_name_idx" ON "products" USING GIN ("name" gin_trgm_ops);
 
 -- CreateIndex
 CREATE UNIQUE INDEX "likes_product_id_user_id_key" ON "likes"("product_id", "user_id");
+
+-- CreateIndex
+CREATE INDEX "refresh_tokens_rotated_at_idx" ON "refresh_tokens"("rotated_at");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");

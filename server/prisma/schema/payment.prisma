@@ -4,6 +4,7 @@ enum PaymentStatus {
     FAILED
     REFUNDED
     PARTIALLY_REFUNDED
+    DISPUTED
 }
 
 model Payment {
@@ -23,4 +24,15 @@ model Payment {
     createdAt             DateTime      @default(now()) @map("created_at")
 
     @@map("payments")
+}
+
+// Stripe redelivers an event on any non-2xx response. The status guards in paymentService
+// make today's handlers naturally idempotent, but anything that increments or credits would
+// double-apply on a retry — this makes the guarantee explicit rather than incidental.
+model ProcessedStripeEvent {
+    eventId     String   @id @map("event_id")
+    type        String
+    processedAt DateTime @default(now()) @map("processed_at")
+
+    @@map("processed_stripe_events")
 }
