@@ -33,10 +33,16 @@ export default function RegisterPage() {
                 id="name"
                 type="text"
                 autoComplete="name"
+                aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? 'name-error' : undefined}
                 className={inputClass}
                 {...register('name')}
               />
-              {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
+              {errors.name && (
+                <p id="name-error" role="alert" className="text-destructive text-xs">
+                  {errors.name.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -47,10 +53,16 @@ export default function RegisterPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? 'email-error' : undefined}
                 className={inputClass}
                 {...register('email')}
               />
-              {errors.email && <p className="text-destructive text-xs">{errors.email.message}</p>}
+              {errors.email && (
+                <p id="email-error" role="alert" className="text-destructive text-xs">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -61,11 +73,15 @@ export default function RegisterPage() {
                 id="password"
                 type="password"
                 autoComplete="new-password"
+                aria-invalid={!!errors.password}
+                aria-describedby={errors.password ? 'password-error' : undefined}
                 className={inputClass}
                 {...register('password')}
               />
               {errors.password && (
-                <p className="text-destructive text-xs">{errors.password.message}</p>
+                <p id="password-error" role="alert" className="text-destructive text-xs">
+                  {errors.password.message}
+                </p>
               )}
             </div>
 
@@ -77,11 +93,15 @@ export default function RegisterPage() {
                 id="confirmPassword"
                 type="password"
                 autoComplete="new-password"
+                aria-invalid={!!errors.confirmPassword}
+                aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined}
                 className={inputClass}
                 {...register('confirmPassword')}
               />
               {errors.confirmPassword && (
-                <p className="text-destructive text-xs">{errors.confirmPassword.message}</p>
+                <p id="confirmPassword-error" role="alert" className="text-destructive text-xs">
+                  {errors.confirmPassword.message}
+                </p>
               )}
             </div>
 

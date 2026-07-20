@@ -33,10 +33,16 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? 'email-error' : undefined}
                 className={inputClass}
                 {...register('email')}
               />
-              {errors.email && <p className="text-destructive text-xs">{errors.email.message}</p>}
+              {errors.email && (
+                <p id="email-error" role="alert" className="text-destructive text-xs">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -55,11 +61,15 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 autoComplete="current-password"
+                aria-invalid={!!errors.password}
+                aria-describedby={errors.password ? 'password-error' : undefined}
                 className={inputClass}
                 {...register('password')}
               />
               {errors.password && (
-                <p className="text-destructive text-xs">{errors.password.message}</p>
+                <p id="password-error" role="alert" className="text-destructive text-xs">
+                  {errors.password.message}
+                </p>
               )}
             </div>
 

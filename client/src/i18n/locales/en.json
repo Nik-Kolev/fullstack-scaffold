@@ -22,6 +22,12 @@
     "privacy": "Privacy",
     "cookies": "Cookies"
   },
+  "a11y": {
+    "switchToBulgarian": "Switch to Bulgarian",
+    "switchToEnglish": "Switch to English",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
   "footer": {
     "description": "A modern fullstack starter built with Express, Prisma, React, and Tailwind. Copy, customise, and ship.",
     "columns": {

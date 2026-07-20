@@ -22,6 +22,12 @@
     "privacy": "Поверителност",
     "cookies": "Бисквитки"
   },
+  "a11y": {
+    "switchToBulgarian": "Превключи на български",
+    "switchToEnglish": "Превключи на английски",
+    "openMenu": "Отвори менюто",
+    "closeMenu": "Затвори менюто"
+  },
   "footer": {
     "description": "Модерен fullstack шаблон, изграден с Express, Prisma, React и Tailwind. Копирай, персонализирай и пусни.",
     "columns": {

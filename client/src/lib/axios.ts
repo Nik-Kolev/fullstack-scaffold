@@ -40,6 +40,14 @@ const NON_RETRYABLE_AUTH_PATHS = [
 let isRefreshing = false
 let waitQueue: QueueEntry[] = []
 
+// A 401 on the retry means the fresh token was rejected too — the session is genuinely gone.
+function handleRetryFailure(error: unknown) {
+  if (axios.isAxiosError(error) && error.response?.status === 401) {
+    clearAccessToken()
+    window.location.href = '/login'
+  }
+}
+
 function drainQueue(err: unknown = null) {
   waitQueue.forEach((cb) => cb(err))
   waitQueue = []
@@ -61,7 +69,13 @@ api.interceptors.response.use(
       return new Promise((resolve, reject) => {
         waitQueue.push((err) => {
           if (err) return reject(err)
-          api(original).then(resolve).catch(reject)
+          original._retry = true
+          api(original)
+            .then(resolve)
+            .catch((retryError) => {
+              handleRetryFailure(retryError)
+              reject(retryError)
+            })
         })
       })
     }
@@ -69,13 +83,12 @@ api.interceptors.response.use(
     original._retry = true
     isRefreshing = true
 
+    let refreshedToken: string
     try {
       const { data } = await axios.post<{ accessToken: string }>(`${BASE_URL}/auth/refresh`, null, {
         withCredentials: true,
       })
-      setAccessToken(data.accessToken)
-      drainQueue()
-      return api(original)
+      refreshedToken = data.accessToken
     } catch (refreshError) {
       clearAccessToken()
       drainQueue(refreshError)
@@ -83,6 +96,16 @@ api.interceptors.response.use(
       return Promise.reject(refreshError)
     } finally {
       isRefreshing = false
+    }
+
+    setAccessToken(refreshedToken)
+    drainQueue()
+
+    try {
+      return await api(original)
+    } catch (retryError) {
+      handleRetryFailure(retryError)
+      throw retryError
     }
   },
 )

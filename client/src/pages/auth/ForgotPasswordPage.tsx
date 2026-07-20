@@ -49,11 +49,15 @@ export default function ForgotPasswordPage() {
                     id="email"
                     type="email"
                     autoComplete="email"
+                    aria-invalid={!!errors.email}
+                    aria-describedby={errors.email ? 'email-error' : undefined}
                     className={inputClass}
                     {...register('email')}
                   />
                   {errors.email && (
-                    <p className="text-destructive text-xs">{errors.email.message}</p>
+                    <p id="email-error" role="alert" className="text-destructive text-xs">
+                      {errors.email.message}
+                    </p>
                   )}
                 </div>
 

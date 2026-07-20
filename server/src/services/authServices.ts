@@ -6,13 +6,22 @@ import { toSafeUser, type SafeUser } from '../utils/safeUser.js';
 import bcrypt from 'bcrypt';
 import OAuth2Client, { createOAuthClient } from '../lib/googleOAuth.js';
 import { google } from 'googleapis';
-import redis from '../lib/redis.js';
+import redis, { tokensValidAfterKey } from '../lib/redis.js';
 import { emailQueue } from '../lib/bullmq.js';
 import crypto from 'crypto';
 import { passwordRegex } from '../schemas/auth.schema.js';
 
 const INVALID_CREDENTIALS_MESSAGE =
 	'The email address or password you entered is incorrect. Please try again.';
+
+// Compared against when the email is unknown, so both paths cost the same ~100ms of bcrypt.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomUUID(), 10);
+
+const REFRESH_GRACE_MS = 10_000;
+
+const stampTokensValidAfter = async (userId: number, issuedAt: number) => {
+	await redis.setex(tokensValidAfterKey(userId), 15 * 60, issuedAt);
+};
 
 export const createUser = async (data: Prisma.UserCreateInput & { password: string }) => {
 	const { password, ...rest } = data;
@@ -50,13 +59,10 @@ export const loginUser = async (email: string, password: string) => {
 		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE, 'INVALID_CREDENTIALS'); // shape alone proves it can't be a real password
 	}
 
-	const userMatch = await prisma.user.findUnique({ where: { email }, omit: { password: false } });
+	const userMatch = await prisma.user.findUnique({ where: { email } });
 
-	if (!userMatch) {
-		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE, 'INVALID_CREDENTIALS');
-	}
-
-	if (!userMatch.password) {
+	if (!userMatch || !userMatch.password) {
+		await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
 		throw new CustomError(401, INVALID_CREDENTIALS_MESSAGE, 'INVALID_CREDENTIALS');
 	}
 
@@ -84,34 +90,56 @@ export const logoutUser = async (refreshTokenId: string) => {
 };
 
 export const refreshToken = async (refreshTokenId: string, userId: number) => {
-	const deleted = await prisma.refreshToken.deleteMany({
-		where: { refreshTokenId, expiresAt: { gt: new Date() } },
-	});
-
-	if (deleted.count === 0) {
-		throw new CustomError(401, 'Invalid or expired refresh token.');
-	}
-
 	const user = await prisma.user.findUnique({ where: { id: userId } });
 	if (!user) {
-		throw new CustomError(401, 'Session is invalid, please log in again.');
+		throw new CustomError(401, 'Session is invalid, please log in again.', 'SESSION_INVALID');
 	}
 
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
 
-	await prisma.refreshToken.create({
-		data: {
-			userId: user.id,
-			refreshTokenId: refreshToken.refreshTokenId!,
-			expiresAt: refreshToken.expiryDate,
-		},
+	const claimed = await prisma.refreshToken.updateMany({
+		where: { refreshTokenId, rotatedAt: null, expiresAt: { gt: new Date() } },
+		data: { rotatedAt: new Date(), replacedById: refreshToken.refreshTokenId! },
 	});
 
-	return { accessToken, refreshToken };
+	if (claimed.count === 1) {
+		await prisma.refreshToken.create({
+			data: {
+				userId: user.id,
+				refreshTokenId: refreshToken.refreshTokenId!,
+				expiresAt: refreshToken.expiryDate,
+			},
+		});
+
+		return { accessToken, refreshToken };
+	}
+
+	const existing = await prisma.refreshToken.findUnique({ where: { refreshTokenId } });
+
+	if (
+		!existing?.rotatedAt ||
+		!existing.replacedById ||
+		Date.now() - existing.rotatedAt.getTime() >= REFRESH_GRACE_MS
+	) {
+		throw new CustomError(401, 'Invalid or expired refresh token.', 'INVALID_REFRESH_TOKEN');
+	}
+
+	const successor = await prisma.refreshToken.findUnique({
+		where: { refreshTokenId: existing.replacedById },
+	});
+
+	if (!successor || successor.expiresAt < new Date()) {
+		throw new CustomError(401, 'Invalid or expired refresh token.', 'INVALID_REFRESH_TOKEN');
+	}
+
+	return {
+		accessToken: JWT.generateToken('access', user).token,
+		refreshToken: JWT.signRefreshTokenFor(user, successor.refreshTokenId, successor.expiresAt),
+	};
 };
 
-export const getGoogleAuthUrl = () => {
-	return OAuth2Client.generateAuthUrl({ scope: ['email', 'profile'] });
+export const getGoogleAuthUrl = (state: string) => {
+	return OAuth2Client.generateAuthUrl({ scope: ['email', 'profile'], state });
 };
 
 export const handleGoogleCallback = async (code: string) => {
@@ -168,7 +196,7 @@ export const handleGoogleCallback = async (code: string) => {
 
 export const exchangeGoogleCode = async (code: string) => {
 	const raw = await redis.getdel(`oauth:code:${code}`);
-	if (!raw) throw new CustomError(401, 'Invalid or expired OAuth code.');
+	if (!raw) throw new CustomError(401, 'Invalid or expired OAuth code.', 'INVALID_OAUTH_CODE');
 	return JSON.parse(raw) as {
 		accessToken: string;
 		user: SafeUser;
@@ -179,7 +207,6 @@ export const exchangeGoogleCode = async (code: string) => {
 export const blacklistToken = async (jti: string, exp: number) => {
 	const ttl = exp - Math.floor(Date.now() / 1000);
 	if (ttl > 0) await redis.setex(`blacklist:${jti}`, ttl, 'true');
-	//instead of true it can be 1 - does not matter, the value here is not needed
 };
 
 export const changePassword = async (
@@ -187,24 +214,33 @@ export const changePassword = async (
 	currentPassword: string | undefined,
 	newPassword: string,
 ) => {
-	const user = await prisma.user.findUnique({ where: { id: userId }, omit: { password: false } });
+	const user = await prisma.user.findUnique({ where: { id: userId } });
 
 	if (!user) {
-		throw new CustomError(401, 'Session is invalid, please log in again.');
+		throw new CustomError(401, 'Session is invalid, please log in again.', 'SESSION_INVALID');
 		// edge case, if user is deleted in the future and accessToken is still active
 	}
 
 	if (user.password) {
 		if (!currentPassword) {
-			throw new CustomError(400, 'Current password is required.');
+			throw new CustomError(
+				400,
+				'Current password is required.',
+				'CURRENT_PASSWORD_REQUIRED',
+			);
 		}
 		const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
 		if (!isPasswordValid) {
-			throw new CustomError(401, 'Current password is incorrect.');
+			throw new CustomError(
+				401,
+				'Current password is incorrect.',
+				'INVALID_CURRENT_PASSWORD',
+			);
 		}
 	}
 
 	const newHashedPassword = await bcrypt.hash(newPassword, 10);
+	const issuedAt = Math.floor(Date.now() / 1000);
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user);
 
 	const [, updatedUser] = await prisma.$transaction([
@@ -218,6 +254,12 @@ export const changePassword = async (
 			},
 		}),
 	]);
+
+	try {
+		await stampTokensValidAfter(user.id, issuedAt);
+	} catch (_) {
+		// Redis failure — old access tokens expire naturally within 15 min
+	}
 
 	try {
 		await emailQueue.add('password-changed', { name: user.name, email: user.email });
@@ -273,6 +315,7 @@ export const resetPassword = async (token: string, newPassword: string) => {
 
 	const newHashedPassword = await bcrypt.hash(newPassword, 10);
 
+	const issuedAt = Math.floor(Date.now() / 1000);
 	const { accessToken, refreshToken } = JWT.generateTokenPair(user.user);
 
 	const [, , updatedUser] = await prisma.$transaction([
@@ -287,6 +330,12 @@ export const resetPassword = async (token: string, newPassword: string) => {
 			},
 		}),
 	]);
+
+	try {
+		await stampTokensValidAfter(user.user.id, issuedAt);
+	} catch (_) {
+		// Redis failure — old access tokens expire naturally within 15 min
+	}
 
 	try {
 		await emailQueue.add('password-changed', { name: user.user.name, email: user.user.email });

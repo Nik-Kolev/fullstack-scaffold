@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 export default function AuthHeader() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const isEnglish = i18n.resolvedLanguage === 'en'
   const toggleLang = () => i18n.changeLanguage(isEnglish ? 'bg' : 'en')
 
@@ -16,7 +16,7 @@ export default function AuthHeader() {
       <button
         onClick={toggleLang}
         data-testid="lang-toggle"
-        aria-label={isEnglish ? 'Switch to Bulgarian' : 'Switch to English'}
+        aria-label={t(isEnglish ? 'a11y.switchToBulgarian' : 'a11y.switchToEnglish')}
         className="text-muted-foreground hover:text-foreground w-8 text-sm font-medium transition-colors"
       >
         {isEnglish ? 'BG' : 'EN'}

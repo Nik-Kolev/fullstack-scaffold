@@ -40,5 +40,5 @@ export const resetPasswordSchema = z.object({
 });
 
 export const googleCodeSchema = z.object({
-	code: z.string().uuid('Invalid OAuth code format.'),
+	code: z.uuid('Invalid OAuth code format.'),
 });

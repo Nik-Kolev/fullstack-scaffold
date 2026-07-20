@@ -21,7 +21,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function Navbar() {
   const { t, i18n } = useTranslation()
-  const { user, logout } = useAuth()
+  const { user, logout, isLoading } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
@@ -71,7 +71,7 @@ export default function Navbar() {
           <button
             onClick={toggleLang}
             data-testid="lang-toggle"
-            aria-label={isEnglish ? 'Switch to Bulgarian' : 'Switch to English'}
+            aria-label={t(isEnglish ? 'a11y.switchToBulgarian' : 'a11y.switchToEnglish')}
             className="text-muted-foreground hover:text-foreground w-8 text-sm font-medium transition-colors"
           >
             {isEnglish ? 'BG' : 'EN'}
@@ -81,7 +81,7 @@ export default function Navbar() {
 
           <div className="hidden items-center gap-3 md:flex">
             <div className="bg-border h-5 w-px" />
-            {user ? (
+            {isLoading ? null : user ? (
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
                 {t('common.logout')}
@@ -101,7 +101,7 @@ export default function Navbar() {
           <button
             className="text-foreground transition-colors md:hidden"
             onClick={() => setMenuOpen((o) => !o)}
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-label={t(menuOpen ? 'a11y.closeMenu' : 'a11y.openMenu')}
           >
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -121,7 +121,7 @@ export default function Navbar() {
             ))}
           </nav>
           <div className="mt-4 flex items-center justify-center gap-3 border-t pt-4">
-            {user ? (
+            {isLoading ? null : user ? (
               <Button
                 variant="ghost"
                 size="sm"

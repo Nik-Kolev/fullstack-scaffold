@@ -1,7 +1,9 @@
 import type { Request, Response } from 'express';
+import crypto from 'crypto';
 import * as authService from '../services/authServices.js';
 import * as JWT from '../lib/jwt.js';
 import CustomError from '../utils/customError.js';
+import { OAUTH_STATE_COOKIE, setOAuthStateCookie, setRefreshCookie } from '../utils/authCookies.js';
 
 export const createUser = async (req: Request, res: Response) => {
 	const { email, name, password } = req.body;
@@ -11,12 +13,7 @@ export const createUser = async (req: Request, res: Response) => {
 		password,
 	});
 
-	res.cookie('refreshToken', refreshToken.token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
-		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
-	});
+	setRefreshCookie(res, refreshToken.token, refreshToken.expiryDate);
 	res.status(201).json({ user, accessToken });
 };
 
@@ -24,12 +21,7 @@ export const loginUser = async (req: Request, res: Response) => {
 	const { email, password } = req.body;
 	const { user, accessToken, refreshToken } = await authService.loginUser(email, password);
 
-	res.cookie('refreshToken', refreshToken.token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
-		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
-	});
+	setRefreshCookie(res, refreshToken.token, refreshToken.expiryDate);
 	res.status(200).json({ user, accessToken });
 };
 
@@ -66,7 +58,7 @@ export const refreshToken = async (req: Request, res: Response) => {
 
 	if (!cookie) {
 		res.clearCookie('refreshToken');
-		throw new CustomError(401, 'No refresh token provided.');
+		throw new CustomError(401, 'No refresh token provided.', 'NO_REFRESH_TOKEN');
 	}
 
 	try {
@@ -77,12 +69,7 @@ export const refreshToken = async (req: Request, res: Response) => {
 			token.userId as number,
 		);
 
-		res.cookie('refreshToken', refreshToken.token, {
-			httpOnly: true,
-			secure: process.env.NODE_ENV === 'production',
-			sameSite: 'strict',
-			maxAge: refreshToken.expiryDate.getTime() - Date.now(),
-		});
+		setRefreshCookie(res, refreshToken.token, refreshToken.expiryDate);
 		res.status(200).json({ accessToken });
 	} catch (err) {
 		res.clearCookie('refreshToken');
@@ -90,21 +77,31 @@ export const refreshToken = async (req: Request, res: Response) => {
 	}
 };
 
-export const googleRedirect = (req: Request, res: Response) => {
-	const url = authService.getGoogleAuthUrl();
-	res.redirect(url);
+export const googleRedirect = (_req: Request, res: Response) => {
+	const state = crypto.randomBytes(32).toString('hex');
+	setOAuthStateCookie(res, state);
+
+	res.redirect(authService.getGoogleAuthUrl(state));
 };
 
 export const googleCallback = async (req: Request, res: Response) => {
 	const code = req.query.code as string;
+	const returnedState = req.query.state as string | undefined;
+	const expectedState = req.cookies[OAUTH_STATE_COOKIE] as string | undefined;
+
+	res.clearCookie(OAUTH_STATE_COOKIE);
 
 	try {
+		if (!expectedState || !returnedState || expectedState !== returnedState) {
+			throw new CustomError(401, 'OAuth state mismatch.', 'OAUTH_STATE_MISMATCH');
+		}
+
 		const { oauthCode } = await authService.handleGoogleCallback(code);
 		res.redirect(`${process.env.ORIGIN}/auth/callback?code=${oauthCode}`);
-	} catch {
-		// This leg must always redirect back into the popup, success or failure —
-		// GoogleCallbackPage.tsx is the only place that can postMessage to window.opener,
-		// so letting an error reach errorHandler here would dead-end as raw JSON in the popup.
+	} catch (err) {
+		// Must redirect, never throw: an errorHandler response would dead-end as raw JSON
+		// inside the popup, which is the only context that can postMessage to window.opener.
+		console.error('[auth] Google OAuth callback failed:', err);
 		res.redirect(`${process.env.ORIGIN}/auth/callback?error=1`);
 	}
 };
@@ -113,12 +110,7 @@ export const exchangeGoogleCode = async (req: Request, res: Response) => {
 	const { code } = req.body;
 	const { accessToken, user, refreshToken } = await authService.exchangeGoogleCode(code);
 
-	res.cookie('refreshToken', refreshToken.token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
-		maxAge: new Date(refreshToken.expiryDate).getTime() - Date.now(),
-	});
+	setRefreshCookie(res, refreshToken.token, new Date(refreshToken.expiryDate));
 
 	res.status(200).json({ accessToken, user });
 };
@@ -139,12 +131,7 @@ export const changePassword = async (req: Request, res: Response) => {
 		// Redis failure — old token expires naturally within 15 min
 	}
 
-	res.cookie('refreshToken', refreshToken.token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
-		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
-	});
+	setRefreshCookie(res, refreshToken.token, refreshToken.expiryDate);
 
 	res.status(200).json({ user, accessToken, message: 'Password changed successfully.' });
 };
@@ -164,12 +151,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 
 	const { user, accessToken, refreshToken } = await authService.resetPassword(token, newPassword);
 
-	res.cookie('refreshToken', refreshToken.token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
-		maxAge: refreshToken.expiryDate.getTime() - Date.now(),
-	});
+	setRefreshCookie(res, refreshToken.token, refreshToken.expiryDate);
 
 	res.status(200).json({ user, accessToken, message: 'Password changed successfully.' });
 };

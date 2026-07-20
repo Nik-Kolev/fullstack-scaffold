@@ -55,6 +55,26 @@ export function verifyToken(type: TokenType, token: string): JwtPayload {
 	return jwt.verify(token, getSecret(type)) as JwtPayload;
 }
 
+export function signRefreshTokenFor(
+	data: TokenData,
+	refreshTokenId: string,
+	expiryDate: Date,
+): TokenResult {
+	const expiresIn = Math.max(1, Math.floor((expiryDate.getTime() - Date.now()) / 1000));
+	const token = jwt.sign(
+		{
+			userId: data.id,
+			email: data.email,
+			role: data.role,
+			jti: crypto.randomUUID(),
+			refreshTokenId,
+		},
+		getSecret('refresh'),
+		{ expiresIn },
+	);
+	return { token, expiryDate, refreshTokenId };
+}
+
 export function generateTokenPair(data: TokenData) {
 	const { token: accessToken } = generateToken('access', data);
 	const refreshToken = generateToken('refresh', data);

@@ -50,11 +50,15 @@ export default function ResetPasswordPage() {
                     id="newPassword"
                     type="password"
                     autoComplete="new-password"
+                    aria-invalid={!!errors.newPassword}
+                    aria-describedby={errors.newPassword ? 'newPassword-error' : undefined}
                     className={inputClass}
                     {...register('newPassword')}
                   />
                   {errors.newPassword && (
-                    <p className="text-destructive text-xs">{errors.newPassword.message}</p>
+                    <p id="newPassword-error" role="alert" className="text-destructive text-xs">
+                      {errors.newPassword.message}
+                    </p>
                   )}
                 </div>
 
@@ -66,11 +70,15 @@ export default function ResetPasswordPage() {
                     id="confirmPassword"
                     type="password"
                     autoComplete="new-password"
+                    aria-invalid={!!errors.confirmPassword}
+                    aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined}
                     className={inputClass}
                     {...register('confirmPassword')}
                   />
                   {errors.confirmPassword && (
-                    <p className="text-destructive text-xs">{errors.confirmPassword.message}</p>
+                    <p id="confirmPassword-error" role="alert" className="text-destructive text-xs">
+                      {errors.confirmPassword.message}
+                    </p>
                   )}
                 </div>
 

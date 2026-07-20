@@ -16,6 +16,8 @@ const corsOptions: CorsOptions = {
 };
 
 export default function expressConfig(app: Application) {
+	app.set('trust proxy', 1);
+
 	app.use(
 		helmet({
 			contentSecurityPolicy: {
@@ -24,6 +26,8 @@ export default function expressConfig(app: Application) {
 					'upgrade-insecure-requests': process.env.NODE_ENV === 'production' ? [] : null,
 				},
 			},
+			// Re-enabling this severs window.opener on the Google OAuth popup's redirect hop.
+			crossOriginOpenerPolicy: false,
 		}),
 	);
 	app.use(generalLimiter);
