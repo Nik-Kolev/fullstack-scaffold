@@ -1,9 +1,11 @@
 import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
 import { emailQueue } from '../lib/bullmq.js';
 import emailWorker, { handleEmailJob } from '../workers/email.worker.js';
+import { handleTokenCleanupJob } from '../workers/tokenCleanup.worker.js';
 import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { redisConnectionOptions } from '../lib/redis.js';
 import { sendEmail } from '../lib/resend.js';
+import prisma from '../lib/prisma.js';
 
 vi.mock('../lib/resend.js', () => ({
 	sendEmail: vi.fn().mockResolvedValue(undefined),
@@ -80,5 +82,90 @@ describe('email worker', () => {
 	it('completes a welcome job end to end', async () => {
 		const job = await e2eQueue.add('welcome', { name: 'Test', email: 'test@example.com' });
 		await expect(job.waitUntilFinished(e2eQueueEvents)).resolves.not.toThrow();
+	});
+});
+
+describe('token cleanup worker', () => {
+	beforeEach(async () => {
+		// Payment has no onDelete: Cascade to User (unlike RefreshToken/PasswordResetToken),
+		// so a leftover row here would FK-violate on user.deleteMany() below.
+		await prisma.payment.deleteMany();
+		await prisma.refreshToken.deleteMany();
+		await prisma.passwordResetToken.deleteMany();
+		await prisma.user.deleteMany();
+	});
+
+	afterAll(async () => {
+		await prisma.$disconnect();
+	});
+
+	it('deletes expired password reset tokens but leaves active ones', async () => {
+		const user = await prisma.user.create({
+			data: { email: 'cleanup-test@example.com', name: 'Cleanup', password: 'hashed' },
+		});
+		await prisma.passwordResetToken.create({
+			data: {
+				passwordResetToken: 'expired-token-hash',
+				userId: user.id,
+				expiresAt: new Date(Date.now() - 60_000),
+			},
+		});
+		await prisma.passwordResetToken.create({
+			data: {
+				passwordResetToken: 'active-token-hash',
+				userId: user.id,
+				expiresAt: new Date(Date.now() + 60_000),
+			},
+		});
+
+		await handleTokenCleanupJob({} as Job);
+
+		const remaining = await prisma.passwordResetToken.findMany({ where: { userId: user.id } });
+		expect(remaining).toHaveLength(1);
+		expect(remaining[0]?.passwordResetToken).toBe('active-token-hash');
+	});
+
+	it('is a no-op when there are no expired tokens', async () => {
+		const user = await prisma.user.create({
+			data: { email: 'cleanup-noop@example.com', name: 'Cleanup', password: 'hashed' },
+		});
+		await prisma.passwordResetToken.create({
+			data: {
+				passwordResetToken: 'still-active-hash',
+				userId: user.id,
+				expiresAt: new Date(Date.now() + 60_000),
+			},
+		});
+
+		await handleTokenCleanupJob({} as Job);
+
+		const count = await prisma.passwordResetToken.count({ where: { userId: user.id } });
+		expect(count).toBe(1);
+	});
+
+	it('deletes expired refresh tokens but leaves active ones', async () => {
+		const user = await prisma.user.create({
+			data: { email: 'cleanup-refresh@example.com', name: 'Cleanup', password: 'hashed' },
+		});
+		await prisma.refreshToken.create({
+			data: {
+				refreshTokenId: 'expired-refresh-id',
+				userId: user.id,
+				expiresAt: new Date(Date.now() - 60_000),
+			},
+		});
+		await prisma.refreshToken.create({
+			data: {
+				refreshTokenId: 'active-refresh-id',
+				userId: user.id,
+				expiresAt: new Date(Date.now() + 60_000),
+			},
+		});
+
+		await handleTokenCleanupJob({} as Job);
+
+		const remaining = await prisma.refreshToken.findMany({ where: { userId: user.id } });
+		expect(remaining).toHaveLength(1);
+		expect(remaining[0]?.refreshTokenId).toBe('active-refresh-id');
 	});
 });
