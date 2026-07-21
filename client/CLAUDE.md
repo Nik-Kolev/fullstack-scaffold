@@ -1,7 +1,7 @@
 # Client — Conventions
 
 See root `CLAUDE.md` for stack, project structure, and env vars.  
-See `server/README.md → Frontend Integration Notes` for response shapes and API contract gotchas (payment cents, upload key encoding, auth state on change-password).
+See `server/README.md → Frontend Integration Notes` for response shapes and API contract gotchas (the error-code table, auth state on change-password).
 
 ---
 

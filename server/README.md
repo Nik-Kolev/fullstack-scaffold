@@ -143,6 +143,7 @@ Named codes in use so far:
 | `NO_REFRESH_TOKEN` / `INVALID_REFRESH_TOKEN` / `SESSION_INVALID`          | `POST /auth/refresh`                                                    |
 | `CURRENT_PASSWORD_REQUIRED` / `INVALID_CURRENT_PASSWORD`                  | change-password                                                         |
 | `OAUTH_STATE_MISMATCH` / `INVALID_OAUTH_CODE` / `GOOGLE_EMAIL_UNVERIFIED` | Google OAuth                                                            |
+| `USER_NOT_FOUND`                                                          | `GET /user/me`                                                          |
 
 `TOKEN_REVOKED` covers both a blacklisted `jti` and a token issued before the user's `auth:valid-after` cutoff — the client treats both as "log in again".
 

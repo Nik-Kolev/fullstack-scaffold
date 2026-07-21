@@ -67,7 +67,7 @@ npm run format            # prettier --write src/**/*.ts
 
 - `eslint.config.js` — flat config, mirrors `client/eslint.config.js` (`@eslint/js` + `typescript-eslint` + `globals`), swapped to `globals.node` with no React plugins.
 - Params required by a framework signature but unused in the body (Express error middleware's 4th param, a BullMQ job processor's `job` arg) are prefixed `_` and covered by `argsIgnorePattern: '^_'` / `caughtErrorsIgnorePattern: '^_'` on `no-unused-vars` — this is a pre-existing codebase convention, not a lint workaround.
-- `**/*.test.ts` has `no-explicit-any` turned off — test mocks casting partial third-party SDK responses (e.g. Stripe) past their full type are expected there; production code stays strict.
+- `**/*.test.ts` has `no-explicit-any` turned off — test mocks casting partial third-party SDK responses (e.g. `googleapis`) past their full type are expected there; production code stays strict.
 
 ### Docker
 

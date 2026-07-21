@@ -4,7 +4,7 @@ import * as userService from '../services/userServices.js';
 
 export const getMe = async (req: Request, res: Response) => {
 	const user = await userService.getUser(req.user!.userId);
-	if (!user) throw new CustomError(404, 'User not found.');
+	if (!user) throw new CustomError(404, 'User not found.', 'USER_NOT_FOUND');
 	res.status(200).json({ user });
 };
 

@@ -135,4 +135,4 @@ RESEND_REPLY_TO=            # e.g. your Gmail — users who reply land here
 
 **Scope reset — done.** The product catalog, Stripe checkout, Socket.io, and Cloudflare R2/file uploads were removed. Each had grown into its own multi-phase effort (a full e-commerce catalog with cursor pagination/caching/load-testing; a Stripe integration with webhooks and disputes) that outgrew what a scaffold needs to demonstrate — the actual deliverable is a fully implemented base for future projects regardless of their purpose: solid auth, error handling, and i18n-ready FE pages. Redis/BullMQ (email queue, nightly token cleanup, rate limiting, auth token revocation) stayed — core auth infrastructure, not tied to the removed features.
 
-**Next — TBD**, per `roadmap.md`.
+**Next — nothing in progress**, per `roadmap.md`.
