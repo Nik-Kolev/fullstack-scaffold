@@ -19,8 +19,8 @@ export default defineConfig([
 		},
 	},
 	{
-		// Stripe SDK mock fixtures cast partial responses past the full type — tracked
-		// in issue-tasks.md under "stripe", to be typed properly during the Stripe FE phase.
+		// Third-party SDK mock fixtures (e.g. googleapis) cast partial responses past
+		// the full type — legitimate in test fixtures, not worth fighting file by file.
 		files: ['**/*.test.ts'],
 		rules: {
 			'@typescript-eslint/no-explicit-any': 'off',

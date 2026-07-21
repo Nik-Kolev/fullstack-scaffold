@@ -5,13 +5,6 @@ import prisma from '../lib/prisma.js';
 import redis from '../lib/redis.js';
 
 vi.mock('../lib/bullmq.js', () => ({ emailQueue: { add: vi.fn() } }));
-vi.mock('../lib/stripe.js', () => ({
-	default: {
-		customers: { create: vi.fn() },
-		checkout: { sessions: { create: vi.fn(), retrieve: vi.fn() } },
-		webhooks: { constructEvent: vi.fn() },
-	},
-}));
 
 const USER = { email: 'user@example.com', password: 'Test1234', name: 'Test User' };
 
@@ -24,8 +17,6 @@ async function registerAndLogin() {
 }
 
 beforeEach(async () => {
-	await prisma.payment.deleteMany();
-	await prisma.userFile.deleteMany();
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();
 	await redis.flushdb();

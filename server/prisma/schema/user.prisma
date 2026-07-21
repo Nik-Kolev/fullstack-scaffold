@@ -7,12 +7,8 @@ model User {
     googleId            String?              @unique @map("google_id")
     createdAt           DateTime             @default(now()) @map("created_at")
     updatedAt           DateTime             @updatedAt @map("updated_at")
-    stripeCustomerId    String?              @unique @map("stripe_customer_id")
     refreshTokens       RefreshToken[]
     passwordResetTokens PasswordResetToken[]
-    userFiles           UserFile[]
-    payments            Payment[]
-    likes               Like[]
 
     @@map("users")
 }

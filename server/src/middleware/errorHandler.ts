@@ -2,7 +2,6 @@ import CustomError from '../utils/customError.js';
 import type { Request, Response, NextFunction } from 'express';
 import { Prisma } from '../generated/prisma/index.js';
 import jwt from 'jsonwebtoken';
-import multer from 'multer';
 
 const { JsonWebTokenError, TokenExpiredError } = jwt;
 
@@ -15,23 +14,11 @@ const PRISMA_ERROR_MAP: Record<string, { statusCode: number; message: string }> 
 	P2025: { statusCode: 404, message: 'Record not found.' },
 };
 
-const MULTER_ERROR_MAP: Record<string, { statusCode: number; message: string }> = {
-	LIMIT_FILE_SIZE: { statusCode: 400, message: 'File is too large.' },
-	LIMIT_UNEXPECTED_FILE: {
-		statusCode: 400,
-		message: 'Too many files, or unexpected field name.',
-	},
-};
-
 // Keyed by the violated unique constraint's DB column names (snake_case,
 // per @map — not the Prisma field names), sorted + joined so lookup is
 // order-independent and scales to compound constraints without new branches.
 const UNIQUE_CONSTRAINT_CODES: Record<string, { code: string; message: string }> = {
 	email: { code: 'EMAIL_TAKEN', message: 'An account with this email already exists.' },
-	'product_id,user_id': {
-		code: 'ALREADY_LIKED',
-		message: 'You have already liked this product.',
-	},
 };
 
 function extractPrismaFields(meta: unknown): unknown[] | undefined {
@@ -66,10 +53,6 @@ export function errorHandler(
 		statusCode = error.statusCode;
 		code = error.code;
 		details = error.details;
-	} else if (error instanceof multer.MulterError) {
-		const mapped = MULTER_ERROR_MAP[error.code];
-		statusCode = mapped?.statusCode ?? 400;
-		message = mapped?.message ?? error.message;
 	} else if (error instanceof TokenExpiredError) {
 		message = 'Session expired. Please log in again.';
 		statusCode = 401;

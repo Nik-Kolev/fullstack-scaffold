@@ -63,10 +63,6 @@ npm run format            # prettier --write src/**/*.ts
 - `validateBody` throws `CustomError(400)` and strips unknown fields via `result.data`.
 - `errorHandler` stays Zod-free — errors arrive as `CustomError`.
 
-### File uploads
-
-- `utils/fileValidation.ts` verifies uploaded bytes against the declared mimetype (magic-byte check) and derives the storage extension from the mimetype, not the client-supplied filename — a client-supplied mimetype/extension is trivially spoofable. `assertMatchesDeclaredType`/`extensionForMimeType` are the shared entry points; both `uploadServices.ts` (user files) and `productService.ts` (product images) call them before any R2 write. Any new upload path must reuse these, not reimplement its own content check.
-
 ### Linting
 
 - `eslint.config.js` — flat config, mirrors `client/eslint.config.js` (`@eslint/js` + `typescript-eslint` + `globals`), swapped to `globals.node` with no React plugins.
@@ -97,10 +93,6 @@ The rule: **a user object crosses from service to controller only via `toSafeUse
 Watch relation includes specifically (`include: { user: true }`): they embed the full user, hash included. That's fine for internal use, but the result must never be what gets returned. `resetPassword` does exactly this — reads `user.user.*` internally, returns `toSafeUser(updatedUser)` from the transaction.
 
 `hasPassword` exists as a Prisma result extension for this reason: the client needs to know whether an account has a password set (the OAuth-only case) without the hash ever being in the response shape.
-
-### Cached routes stay role-invariant
-
-Any route behind `redisCache` must return the same body regardless of who asks. `GET /product/:id` therefore filters `isActive: true` for everyone, and admin lookup of deactivated products will be a **separate, uncached, `requireRole`-gated route** — not a branch inside the cached one. Adding role-dependent output to a cached route means the first admin request populates the shared cache and every anonymous visitor is served admin data until the TTL expires. If a cached response ever has to vary, the varying dimension goes in the cache key or the route comes out of the cache.
 
 ### OAuth state
 

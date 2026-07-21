@@ -75,9 +75,6 @@ jobs:
           JWT_REFRESH_SECRET=ci_refresh_secret
           NODE_ENV=test
           REDIS_URL=redis://localhost:6379
-          STRIPE_SECRET_KEY=sk_test_dummy
-          STRIPE_WEBHOOK_SECRET=whsec_dummy
-          R2_PUBLIC_URL=https://r2.example.com
           EOF
       - run: npx dotenv -e .env.test -- prisma migrate deploy
       - run: npm run test

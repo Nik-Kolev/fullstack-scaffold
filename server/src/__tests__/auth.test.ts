@@ -63,7 +63,6 @@ async function login() {
 
 beforeEach(async () => {
 	vi.clearAllMocks();
-	await prisma.payment.deleteMany();
 	await prisma.passwordResetToken.deleteMany();
 	await prisma.refreshToken.deleteMany();
 	await prisma.user.deleteMany();

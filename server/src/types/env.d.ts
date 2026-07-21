@@ -13,13 +13,5 @@ declare namespace NodeJS {
 		RESEND_API_KEY: string;
 		RESEND_FROM: string;
 		RESEND_REPLY_TO: string;
-		R2_PUBLIC_URL: string;
-		R2_ACCESS_KEY_ID: string;
-		R2_SECRET_ACCESS_KEY: string;
-		R2_BUCKET_NAME: string;
-		R2_ACCOUNT_ID: string;
-		R2_ENDPOINT: string;
-		STRIPE_SECRET_KEY: string;
-		STRIPE_WEBHOOK_SECRET: string;
 	}
 }

@@ -1,6 +1,6 @@
 # Fullstack Scaffold — Project Context
 
-Reusable fullstack starter. Goal: clean, copy-paste-friendly patterns. Prioritize clarity and good structure.
+A fully implemented base for future projects, regardless of their purpose. Goal: clean, copy-paste-friendly patterns. Prioritize clarity and good structure over feature breadth.
 
 ## The governing rule — read before proposing any work
 
@@ -16,7 +16,7 @@ Every scoping decision follows from that:
 
 **Definition of done for the project:** every technology on the intended list is implemented and demonstrably working for a case or two. Not a complete marketplace — no promotions, wishlists, reviews, or inventory management. If a feature exists only to make the demo feel like a real shop, it doesn't belong.
 
-**Push back at the start of a unit, not after it.** Before writing the first file, say plainly if the unit is bigger than the scaffold needs and name the smaller version. Once something is half-built, finishing it is usually the right call — so the objection is worth nothing if it arrives late. Two units that already outgrew this brief (the product catalog and Stripe) are the reference point for how much is too much.
+**Push back at the start of a unit, not after it.** Before writing the first file, say plainly if the unit is bigger than the scaffold needs and name the smaller version. Once something is half-built, finishing it is usually the right call — so the objection is worth nothing if it arrives late. A product catalog, Stripe checkout, Socket.io, and R2/file uploads all shipped and were later removed once it was clear they'd outgrown this brief — that removal is the reference point for how much is too much.
 
 When a proposal fails this test, say so and offer the smaller version instead of building it.
 
@@ -41,7 +41,7 @@ When a proposal fails this test, say so and offer the smaller version instead of
 | ORM        | Prisma 7 (multi-file schema, `prisma.config.ts`, PrismaPg adapter) |
 | Database   | PostgreSQL (Docker in dev)                                         |
 | Auth       | JWT — access (15 min) + refresh (7 d, httpOnly cookie)             |
-| Cache      | Redis 7 (`ioredis`) — response caching, BullMQ backend             |
+| Cache      | Redis 7 (`ioredis`) — rate limiting, auth token revocation, BullMQ backend |
 | Validation | Zod v4                                                             |
 | Hashing    | bcrypt v6                                                          |
 
@@ -58,7 +58,7 @@ fullstack-scaffold/
 │   ├── src/
 │   │   ├── config/          # expressConfig.ts — middleware + server start
 │   │   ├── controllers/     # thin: call service, set cookie, send response
-│   │   ├── lib/             # prisma.ts, jwt.ts, (redis.ts, socket.ts, stripe.ts …)
+│   │   ├── lib/             # prisma.ts, jwt.ts, redis.ts, bullmq.ts, googleOAuth.ts, resend.ts
 │   │   ├── middleware/      # errorHandler, validateBody, isAuthenticated, requireRole
 │   │   ├── routes/          # index.ts mounts all routers; 404.route.ts last
 │   │   ├── schemas/         # Zod schemas — one file per domain
@@ -74,7 +74,7 @@ fullstack-scaffold/
     ├── e2e/                 # Playwright — auth.setup.ts, login.spec.ts, register.spec.ts, forgot-password.spec.ts, reset-password.spec.ts
     ├── playwright.config.ts
     ├── Dockerfile           # multi-stage; ARG VITE_API_URL baked in at build time (Vite inlines env at build, not runtime)
-    ├── nginx.conf           # SPA fallback + reverse-proxies /api and /socket.io to the server service
+    ├── nginx.conf           # SPA fallback + reverse-proxies /api to the server service
     └── src/
         ├── components/      # layout/, shared/, ui/ (shadcn)
         ├── context/         # AuthContext (user + token state)
@@ -121,30 +121,18 @@ REDIS_URL=redis://localhost:6379
 RESEND_API_KEY=
 RESEND_FROM=                # e.g. onboarding@resend.dev (dev) or noreply@yourdomain.com (prod)
 RESEND_REPLY_TO=            # e.g. your Gmail — users who reply land here
-
-# Cloudflare R2
-R2_ACCOUNT_ID=
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
-R2_BUCKET_NAME=
-R2_PUBLIC_URL=              # e.g. https://pub-xxx.r2.dev (from bucket public access settings)
-R2_ENDPOINT=                # EU: https://<accountid>.eu.r2.cloudflarestorage.com
-
-# Stripe
-STRIPE_SECRET_KEY=          # from Stripe Dashboard → Developers → API keys
-STRIPE_WEBHOOK_SECRET=      # from Stripe Dashboard → Webhooks → signing secret
 ```
 
 ---
 
 ## Current State
 
-**Full Docker setup — done.** `docker compose up --build` starts the entire stack (client, server, worker, Postgres, Redis) with no local Node/Postgres/Redis install required, using `.env.example` files that already have working local defaults — no editing needed for the core app to boot. `server/Dockerfile` is a multi-stage build shared by both the `server` and `worker` compose services (`command:` override selects the entrypoint); its `docker-entrypoint.sh` runs `prisma migrate deploy` and (outside `NODE_ENV=production`) `prisma db seed` automatically before starting — both are safe to re-run on every boot, not just the first. `client/Dockerfile` builds a static Vite bundle (`ARG VITE_API_URL=/api`, relative/same-origin since nginx now fronts the whole app) served by nginx, which reverse-proxies `/api` and `/socket.io` to the `server` service using a dynamic-DNS resolver pattern (`resolver 127.0.0.11` + a variable in `proxy_pass`) so it survives the `server` container being recreated without needing its own restart. `server`/`worker`'s `DATABASE_URL`/`REDIS_URL` default to the bundled `postgres`/`redis` containers but can be overridden by setting either in the root `.env` — points the stack at an external database/Redis instance instead, no code change needed. All compose resources (containers, images, volumes, network) share a consistent `scaffold` project name/prefix (explicit `name: scaffold` at the top of `docker-compose.yml`). CI's `.github/workflows/ci.yml` gained a `docker` job that builds all three images so a broken Dockerfile fails the build.
+**Full Docker setup — done.** `docker compose up --build` starts the entire stack (client, server, worker, Postgres, Redis) with no local Node/Postgres/Redis install required, using `.env.example` files that already have working local defaults — no editing needed for the core app to boot. `server/Dockerfile` is a multi-stage build shared by both the `server` and `worker` compose services (`command:` override selects the entrypoint); its `docker-entrypoint.sh` runs `prisma migrate deploy` and (outside `NODE_ENV=production`) `prisma db seed` automatically before starting — both are safe to re-run on every boot, not just the first. `client/Dockerfile` builds a static Vite bundle (`ARG VITE_API_URL=/api`, relative/same-origin since nginx now fronts the whole app) served by nginx, which reverse-proxies `/api` to the `server` service using a dynamic-DNS resolver pattern (`resolver 127.0.0.11` + a variable in `proxy_pass`) so it survives the `server` container being recreated without needing its own restart. `server`/`worker`'s `DATABASE_URL`/`REDIS_URL` default to the bundled `postgres`/`redis` containers but can be overridden by setting either in the root `.env` — points the stack at an external database/Redis instance instead, no code change needed. All compose resources (containers, images, volumes, network) share a consistent `scaffold` project name/prefix (explicit `name: scaffold` at the top of `docker-compose.yml`). CI's `.github/workflows/ci.yml` gained a `docker` job that builds all three images so a broken Dockerfile fails the build.
 
 **FE modernization — done.** All four auth forms (Login, Register, Forgot Password, Reset Password) run on React Hook Form + Zod, with factory-function schemas for i18n error messages. The reviewer pass over the combined CI + security-hardening + full-Docker diff is complete, and `develop` merged to `main` for that batch.
 
 **API error convention — built.** `CustomError`/`errorHandler` carry a stable `code`; no bare `message` reaches the client. See `zod.md` for the full convention (response shape, named codes, `VALIDATION_ERROR` carve-out).
 
-**Product catalog & caching — done.** `Product` reshaped with `Category`/`Like` relations, cursor-based pagination with color/shape/price filters + sort, pg_trgm trigram search on name, and Redis-backed response caching on `GET /product` and `GET /product/:id` with cache-stampede lock protection and precise list-vs-detail invalidation. Load-tested via k6 against ~400k seeded products at 300 concurrent users (see `server/README.md`'s Performance Notes). Reviewer pass on the whole branch preceded merge to `develop` → `main`.
+**Scope reset — done.** The product catalog, Stripe checkout, Socket.io, and Cloudflare R2/file uploads were removed. Each had grown into its own multi-phase effort (a full e-commerce catalog with cursor pagination/caching/load-testing; a Stripe integration with webhooks and disputes) that outgrew what a scaffold needs to demonstrate — the actual deliverable is a fully implemented base for future projects regardless of their purpose: solid auth, error handling, and i18n-ready FE pages. Redis/BullMQ (email queue, nightly token cleanup, rate limiting, auth token revocation) stayed — core auth infrastructure, not tied to the removed features.
 
-**Next — Stripe checkout**, per `roadmap.md`.
+**Next — TBD**, per `roadmap.md`.

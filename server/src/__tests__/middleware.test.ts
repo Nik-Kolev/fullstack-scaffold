@@ -1,12 +1,11 @@
 import request from 'supertest';
 import express from 'express';
-import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isAuth } from '../middleware/isAuthenticated.js';
 
 import { requireRole } from '../middleware/requireRole.js';
-import { authLimiter, uploadLimiter, checkoutLimiter } from '../middleware/rateLimiter.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
 import { errorHandler } from '../middleware/errorHandler.js';
 import redis from '../lib/redis.js';
 
@@ -195,87 +194,5 @@ describe('authLimiter', () => {
 		}
 		const res = await request(limiterApp).get('/ping');
 		expect(res.status).toBe(429);
-	});
-});
-
-// ─── uploadLimiter ───────────────────────────────────────────────────────────
-
-describe('uploadLimiter', () => {
-	const originalNodeEnv = process.env.NODE_ENV;
-	let limiterApp: express.Application;
-
-	beforeEach(async () => {
-		process.env.NODE_ENV = 'production';
-		const keys = await redis.keys('rl:upload:*');
-		if (keys.length) await redis.del(...keys);
-		limiterApp = express();
-		limiterApp.use(uploadLimiter);
-		limiterApp.get('/ping', (_req, res) => res.sendStatus(200));
-		limiterApp.use(errorHandler);
-	});
-
-	afterEach(() => {
-		process.env.NODE_ENV = originalNodeEnv;
-	});
-
-	it('allows requests within the limit', async () => {
-		for (let i = 0; i < 30; i++) {
-			const res = await request(limiterApp).get('/ping');
-			expect(res.status).toBe(200);
-		}
-	});
-
-	it('returns 429 when the limit is exceeded', async () => {
-		for (let i = 0; i < 30; i++) {
-			await request(limiterApp).get('/ping');
-		}
-		const res = await request(limiterApp).get('/ping');
-		expect(res.status).toBe(429);
-	});
-});
-
-// ─── checkoutLimiter ─────────────────────────────────────────────────────────
-
-describe('checkoutLimiter', () => {
-	const originalNodeEnv = process.env.NODE_ENV;
-
-	function appForUser(userId: number) {
-		const checkoutApp = express();
-		checkoutApp.use((req: Request, _res: Response, next: NextFunction) => {
-			req.user = { userId, email: 'test@example.com', role: 'user', jti: 'jti', exp: 0 };
-			next();
-		});
-		checkoutApp.use(checkoutLimiter);
-		checkoutApp.get('/ping', (_req, res) => res.sendStatus(200));
-		checkoutApp.use(errorHandler);
-		return checkoutApp;
-	}
-
-	beforeEach(async () => {
-		process.env.NODE_ENV = 'production';
-		const keys = await redis.keys('rl:checkout:*');
-		if (keys.length) await redis.del(...keys);
-	});
-
-	afterEach(() => {
-		process.env.NODE_ENV = originalNodeEnv;
-	});
-
-	it('allows a single request', async () => {
-		const res = await request(appForUser(1)).get('/ping');
-		expect(res.status).toBe(200);
-	});
-
-	it('returns 429 on a second request within the 5s window', async () => {
-		const app = appForUser(1);
-		await request(app).get('/ping');
-		const res = await request(app).get('/ping');
-		expect(res.status).toBe(429);
-	});
-
-	it('scopes the limit per user — a different userId is not blocked', async () => {
-		await request(appForUser(1)).get('/ping');
-		const res = await request(appForUser(2)).get('/ping');
-		expect(res.status).toBe(200);
 	});
 });

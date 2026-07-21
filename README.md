@@ -1,6 +1,6 @@
 # fullstack-scaffold
 
-Production-ready fullstack starter. Clean architecture, copy-paste-friendly patterns, and a full feature set so you can focus on building product instead of infrastructure.
+A fully implemented base for future projects, regardless of their purpose — not a product, a starting point. Solid auth, error handling, and i18n-ready FE pages, in clean, copy-paste-friendly patterns.
 
 ## What's Included
 
@@ -11,13 +11,10 @@ Production-ready fullstack starter. Clean architecture, copy-paste-friendly patt
 | **Password flows** | Change password, forgot password (email link), reset password — all with email notifications |
 | **Email** | Resend + react-email templates (welcome, password reset, password changed), BullMQ-queued |
 | **Background jobs** | BullMQ — email queue worker, nightly token cleanup cron |
-| **File storage** | Cloudflare R2 (S3-compatible) — multi-file upload, folder listing, delete |
-| **Payments** | Stripe Checkout — one-time sessions, webhook handling, payment history |
-| **Realtime** | Socket.io — per-user rooms, JWT auth on every connection |
-| **Cache** | Redis — response caching, access token blacklisting on logout |
+| **Cache** | Redis — rate limiting, access token blacklisting/revocation on logout and password change |
 | **i18n** | react-i18next — English + Bulgarian |
 | **UI** | Tailwind v4, shadcn/ui, Sonner toasts, ErrorBoundary, NotFoundPage |
-| **Testing** | Vitest + Supertest (server, 198 tests), Playwright e2e (client, auth flows) |
+| **Testing** | Vitest + Supertest (server), Playwright e2e (client, auth flows) |
 
 ## Stack
 
@@ -26,11 +23,8 @@ Production-ready fullstack starter. Clean architecture, copy-paste-friendly patt
 | Client | Vite 8, React 19, TypeScript 6, Tailwind v4, shadcn/ui, Axios, React Router v7 |
 | Server | Express 5, TypeScript (ESM), Prisma 7, PostgreSQL |
 | Auth | JWT — access token (15 min, in-memory) + refresh token (7 d, httpOnly cookie) |
-| Cache | Redis 7 (ioredis) — response caching, BullMQ background jobs |
-| Storage | Cloudflare R2 (S3-compatible) |
+| Cache | Redis 7 (ioredis) — rate limiting, auth token revocation, BullMQ background jobs |
 | Email | Resend + react-email templates |
-| Realtime | Socket.io |
-| Payments | Stripe Checkout |
 
 ## Structure
 
@@ -53,13 +47,13 @@ git clone <repo-url>
 cd fullstack-scaffold
 cp .env.example .env               # already has working local defaults — no editing needed
 cp server/.env.example server/.env # already has working local defaults for the core app;
-                                    # optional services (Stripe, R2, etc.) stay blank until you need them
+                                    # optional services (Resend, Google OAuth) stay blank until you need them
 docker compose up --build -d
 ```
 
 `-d` runs everything in the background and hands your terminal back once containers are up.
 
-That's it — the server container applies pending migrations and seeds the test users/sample products automatically on startup (both are safe to re-run, so this stays true on every `docker compose up`, not just the first). `client/.env` isn't needed for the Docker path — the client's API URL is baked in at build time via `docker-compose.yml`, not read from that file.
+That's it — the server container applies pending migrations and seeds the test users automatically on startup (safe to re-run, so this stays true on every `docker compose up`, not just the first). `client/.env` isn't needed for the Docker path — the client's API URL is baked in at build time via `docker-compose.yml`, not read from that file.
 
 The client is now running at http://localhost:5173, the API at http://localhost:8080. `docker compose down` stops everything; add `-v` to also wipe the database volumes.
 
@@ -124,7 +118,5 @@ The scaffold integrates several external services. All are free-tier friendly fo
 |---|---|---|
 | Google Cloud Console | OAuth 2.0 | [console.cloud.google.com](https://console.cloud.google.com) |
 | Resend | Transactional email | [resend.com](https://resend.com) |
-| Cloudflare R2 | File storage | [dash.cloudflare.com](https://dash.cloudflare.com) |
-| Stripe | Payments | [dashboard.stripe.com](https://dashboard.stripe.com) |
 
 You can leave any service's env vars blank if you're not using that feature yet — unrelated routes will still work.

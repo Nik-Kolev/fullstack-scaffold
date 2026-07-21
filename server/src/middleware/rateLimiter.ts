@@ -32,20 +32,3 @@ export const authLimiter = rateLimit({
 	handler,
 	skip,
 });
-
-export const uploadLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	limit: 30,
-	store: makeStore('rl:upload:'),
-	handler,
-	skip,
-});
-
-export const checkoutLimiter = rateLimit({
-	windowMs: 5 * 1000,
-	limit: 1,
-	keyGenerator: (req) => String(req.user!.userId),
-	store: makeStore('rl:checkout:'),
-	handler,
-	skip,
-});

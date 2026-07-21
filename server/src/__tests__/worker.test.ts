@@ -88,9 +88,6 @@ describe('email worker', () => {
 
 describe('token cleanup worker', () => {
 	beforeEach(async () => {
-		// Payment has no onDelete: Cascade to User (unlike RefreshToken/PasswordResetToken),
-		// so a leftover row here would FK-violate on user.deleteMany() below.
-		await prisma.payment.deleteMany();
 		await prisma.refreshToken.deleteMany();
 		await prisma.passwordResetToken.deleteMany();
 		await prisma.user.deleteMany();
